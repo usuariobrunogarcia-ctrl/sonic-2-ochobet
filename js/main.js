@@ -69,7 +69,7 @@
     const game = new Game(rom, canvas, audio, { theme: themeBox && themeBox.checked });
     const toggleTheme = () => {
       game.setTheme(!game.themeOn);
-      try { localStorage.setItem('s2theme', game.themeOn ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
+      try { localStorage.setItem('s2theme_ug', game.themeOn ? '1' : '0'); } catch (e) { /* sin almacenamiento */ }
     };
     window.addEventListener('keydown', (e) => { if (e.code === 'KeyT') toggleTheme(); });
     const tb = document.getElementById('themebtn');
@@ -96,7 +96,7 @@
     requestAnimationFrame(tick);
   }
 
-  try { const t = localStorage.getItem('s2theme'); if (t !== null) document.getElementById('theme').checked = t === '1'; } catch (e) { /* sin almacenamiento */ }
+  try { const t = localStorage.getItem('s2theme_ug'); if (t !== null) document.getElementById('theme').checked = t === '1'; } catch (e) { /* sin almacenamiento */ }
 
   document.getElementById('romfile').addEventListener('change', async (e) => {
     const f = e.target.files[0];
