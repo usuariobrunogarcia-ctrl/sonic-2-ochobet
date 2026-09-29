@@ -53,6 +53,7 @@ class Game {
     this.levelInactive = false; this.timeOver = false; this.bossActive = false;
     this.chainBonus = 0;
     this.rings = 0; this.score = 0; this.timer = 0; this.extraLifeFlags = 0;
+    this.ringSpillCounter = 0; this.ringSpillAccum = 0; this.ringSpillFrame = 0; this.rngSeed = this.rngSeed || 0;
     this.sonicTopSpeed = 0x600; this.sonicAccel = 0xC; this.sonicDecel = 0x80;
     const s = this.sonic = new Sonic(this);
     s.x = L.startX; s.y = L.startY;
@@ -211,6 +212,21 @@ class Game {
     if (this.rings >= 100 && !(this.extraLifeFlags & 2)) { this.extraLifeFlags |= 2; this.extraLife(); }
     else if (this.rings >= 200 && !(this.extraLifeFlags & 4)) { this.extraLifeFlags |= 4; this.extraLife(); }
   }
+
+  // RandomNumber (mismo generador que el original)
+  randomNumber() {
+    let d1 = this.rngSeed >>> 0;
+    if (!d1) d1 = 0x2A6D365A;
+    const hi0 = d1 & 0xFFFF0000;
+    const D = Math.imul(d1, 41) >>> 0;
+    const lo = D & 0xFFFF, hi = D >>> 16;
+    const sum = (lo + hi) & 0xFFFF;
+    this.rngSeed = ((sum << 16) | lo) >>> 0;
+    return (hi0 | sum) >>> 0;
+  }
+
+  spawnShield() { if (typeof Obj38 !== 'undefined' && !this.slots[6]) { const o = this.spawn(Obj38, 6); o.id = 0x38; o.parent = this.sonic; } }
+  spawnInvincibility() { if (typeof Obj35 !== 'undefined') { const o = this.spawn(Obj35, 8); o.id = 0x35; o.parent = this.sonic; } }
 
   extraLife() { this.lives++; this.audio.music('ExtraLife'); }
 
@@ -551,6 +567,11 @@ class Game {
     this.palCycle();
     this.oscillateDo();
     this.ringMgr.changeFrame();
+    if (this.ringSpillCounter) {
+      this.ringSpillAccum = (this.ringSpillAccum + this.ringSpillCounter) & 0xFFFF;
+      this.ringSpillFrame = (this.ringSpillAccum >> 9) & 3;
+      this.ringSpillCounter--;
+    }
     this.buildSprites();
     this.objectsManager(false);
   }
@@ -593,7 +614,9 @@ class Game {
             sy = t - 128;
           }
         } else { sx = o.x - 128; sy = o.y - 128; }
-        vdp.addSprite(this.getMapping(base, o.mapping_frame), sx, sy, o.art_tile, flips);
+        let pieces = this.getMapping(base, o.mapping_frame);
+        if (o.singlePiece) pieces = pieces.slice(0, 1);
+        vdp.addSprite(pieces, sx, sy, o.art_tile, flips);
         o.render_flags |= RF_ONSCREEN;
       }
     }
