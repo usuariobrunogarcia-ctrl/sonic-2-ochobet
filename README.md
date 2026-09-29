@@ -15,7 +15,7 @@ de sprites y guiones de animación **se leen de tu ROM** en tiempo de ejecución
    (`.bin`, `.md`, `.gen` o `.smd`).
 
 Controles: flechas para moverte, `Z`/`X`/`C` = A/B/C (saltar), `Enter` = Start (pausa).
-También funciona con mando (Gamepad API).
+También funciona con mando (Gamepad API) y, en móviles, con los controles táctiles en pantalla.
 
 ## Estado
 

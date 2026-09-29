@@ -52,7 +52,7 @@ class HUD {
     const tens = Math.floor(v / 10), ones = v % 10;
     if (tens) vdp.loadTiles(this.livesArt.subarray(tens * 32, tens * 32 + 32), HUD_LIVES);
     else vdp.loadTiles(this.blank.subarray(0, 32), HUD_LIVES);
-    vdp.loadTiles(this.livesArt.subarray(ones * 32, ones * 32 + 32), HUD_LIVES + 1);
+    vdp.loadTiles(this.livesArt.subarray(ones * 32, ones * 32 + 32), HUD_LIVES + 2); // hud_letter_vdp_delta = 2 patrones
     this.lastLives = g.lives;
   }
 

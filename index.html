@@ -17,6 +17,20 @@
   #loader input { display: none; }
   #err { color: #ff7070; min-height: 1.5em; }
   .keys { color: var(--muted); font-size: 14px; text-align: center; }
+  #touch { display: none; width: min(960px, calc(100vw - 32px)); justify-content: space-between; align-items: center;
+    user-select: none; -webkit-user-select: none; touch-action: none; }
+  #touch.on { display: flex; }
+  .pad { position: relative; width: 150px; height: 150px; }
+  .pad button, .btns button { position: absolute; background: #2a2a38; color: var(--fg); border: 1px solid #44445a;
+    border-radius: 10px; font-size: 20px; font-family: inherit; touch-action: none; }
+  .pad button { width: 50px; height: 50px; }
+  .pad .u { left: 50px; top: 0; } .pad .d { left: 50px; top: 100px; }
+  .pad .l { left: 0; top: 50px; } .pad .r { left: 100px; top: 50px; }
+  .btns { position: relative; width: 170px; height: 128px; }
+  .btns button { width: 72px; height: 72px; border-radius: 50%; }
+  .btns .a { left: 0; top: 30px; } .btns .b { left: 92px; top: 0; }
+  .btns .st { width: 60px; height: 28px; border-radius: 14px; font-size: 12px; left: 100px; top: 96px; }
+  button.down { background: var(--accent); }
   kbd { background: #2a2a38; border-radius: 4px; padding: 1px 6px; font-family: inherit; }
 </style>
 </head>
@@ -30,6 +44,16 @@
     <p id="err"></p>
   </div>
   <canvas id="screen" width="320" height="224" hidden></canvas>
+  <div id="touch">
+    <div class="pad">
+      <button class="u" data-b="1">▲</button><button class="l" data-b="4">◀</button>
+      <button class="r" data-b="8">▶</button><button class="d" data-b="2">▼</button>
+    </div>
+    <div class="btns">
+      <button class="a" data-b="64">A</button><button class="b" data-b="16">B</button>
+      <button class="st" data-b="128">START</button>
+    </div>
+  </div>
   <div class="keys">Flechas: mover · <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>: saltar (A/B/C) · <kbd>Enter</kbd>: Start/pausa</div>
 
 <script src="js/offsets.js"></script>

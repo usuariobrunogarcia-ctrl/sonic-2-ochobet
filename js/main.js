@@ -11,6 +11,32 @@
   window.addEventListener('keydown', (e) => { if (KEYMAP[e.code]) { held |= KEYMAP[e.code]; e.preventDefault(); } });
   window.addEventListener('keyup', (e) => { if (KEYMAP[e.code]) { held &= ~KEYMAP[e.code]; e.preventDefault(); } });
 
+  // Controles táctiles
+  let touchHeld = 0;
+  const touchEl = document.getElementById('touch');
+  if (touchEl && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+    touchEl.classList.add('on');
+    const active = new Map();
+    const update = () => {
+      touchHeld = 0;
+      for (const b of active.values()) touchHeld |= b;
+      for (const el of touchEl.querySelectorAll('button')) {
+        el.classList.toggle('down', [...active.values()].includes(+el.dataset.b));
+      }
+    };
+    const pick = (t) => {
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      return el && el.dataset && el.dataset.b ? +el.dataset.b : 0;
+    };
+    const onTouch = (e) => {
+      e.preventDefault();
+      active.clear();
+      for (const t of e.touches) { const b = pick(t); if (b) active.set(t.identifier, b); }
+      update();
+    };
+    for (const ev of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) touchEl.addEventListener(ev, onTouch, { passive: false });
+  }
+
   function pollGamepad() {
     let g = 0;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -48,7 +74,7 @@
       acc += Math.min(now - last, 100);
       last = now;
       while (acc >= FRAME) {
-        const pad = held | pollGamepad();
+        const pad = held | touchHeld | pollGamepad();
         const st = (pad & BTN_START) !== 0;
         if (st && !prevStart) { paused = !paused; audio.pause(paused); }
         prevStart = st;
