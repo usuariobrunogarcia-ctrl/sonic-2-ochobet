@@ -13,8 +13,8 @@ class Level {
     const o = rom.o;
     this.art = rom.kos('ArtKos_EHZ');
     const bm16 = rom.kos('BM16_EHZ');
-    this.blocks = new Uint16Array(bm16.length >> 1);
-    for (let i = 0; i < this.blocks.length; i++) this.blocks[i] = (bm16[i * 2] << 8) | bm16[i * 2 + 1];
+    this.blocks = new Uint16Array(0x1800 >> 1); // Block_Table ($1800 bytes)
+    for (let i = 0; i < bm16.length >> 1; i++) this.blocks[i] = (bm16[i * 2] << 8) | bm16[i * 2 + 1];
     const bm128 = rom.kos('BM128_EHZ');
     this.chunks = new Uint16Array(0x8000 >> 1);
     for (let i = 0; i < bm128.length >> 1; i++) this.chunks[i] = (bm128[i * 2] << 8) | bm128[i * 2 + 1];

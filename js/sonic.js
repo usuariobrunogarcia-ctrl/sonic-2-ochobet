@@ -220,7 +220,7 @@ class Sonic extends GameObject {
     this.anim = ANI.Wait;
     if (this.status & ST_ONOBJ) {
       const a1 = this.interact;
-      if (a1 && a1.v.noBalance) { this.lookup(d5); return; }
+      if (a1 && (a1.status & 0x80)) { this.lookup(d5); return; }
       if (a1) {
         let d1 = a1.width_pixels;
         let d2 = d1 * 2 - 2;
@@ -723,13 +723,23 @@ class Sonic extends GameObject {
   resetOnFloor() {
     if (!this.spindash_flag) {
       this.anim = ANI.Walk;
-      if (this.status & ST_ROLL) {
-        this.status &= ~ST_ROLL;
-        this.y_radius = 0x13; this.x_radius = 9;
-        this.anim = ANI.Walk;
-        this.y = s16(this.y - 5);
-      }
+      this.resetOnFloorPart2();
+      return;
     }
+    this.resetOnFloorPart3();
+  }
+
+  resetOnFloorPart2() {
+    if (this.status & ST_ROLL) {
+      this.status &= ~ST_ROLL;
+      this.y_radius = 0x13; this.x_radius = 9;
+      this.anim = ANI.Walk;
+      this.y = s16(this.y - 5);
+    }
+    this.resetOnFloorPart3();
+  }
+
+  resetOnFloorPart3() {
     this.status &= ~(ST_AIR | ST_PUSH | ST_ROLLJUMP);
     this.jumping = 0;
     this.game.chainBonus = 0;

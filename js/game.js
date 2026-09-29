@@ -35,6 +35,7 @@ class Game {
     const rom = this.rom, vdp = this.vdp, L = this.level;
     vdp.vram.fill(0);
     vdp.loadTiles(L.art, 0);
+    for (const plc of ['PlrList_Std1', 'PlrList_Std2', 'PlrList_Ehz1', 'PlrList_Ehz2', 'PlrList_EhzAnimals', 'PlrList_Explosion']) this.loadPLC(plc);
     // Paletas: Pal_BGND (líneas 0-1) y Pal_EHZ (líneas 1-3)
     const pal = (addr, n) => { const w = []; for (let i = 0; i < n; i++) w.push(rom.u16(addr + i * 2)); return w; };
     vdp.setPalette(0, pal(rom.o.Pal_BGND, 32));
@@ -51,16 +52,167 @@ class Game {
     this.scrollLock = false; this.controlLocked = false;
     this.levelInactive = false; this.timeOver = false; this.bossActive = false;
     this.chainBonus = 0;
-    this.rings = 0; this.score = 0; this.timer = 0;
+    this.rings = 0; this.score = 0; this.timer = 0; this.extraLifeFlags = 0;
     this.sonicTopSpeed = 0x600; this.sonicAccel = 0xC; this.sonicDecel = 0x80;
     const s = this.sonic = new Sonic(this);
     s.x = L.startX; s.y = L.startY;
     let cx = L.startX - 0xA0; if (cx < 0) cx = 0; if (cx >= this.camMaxX) cx = this.camMaxX;
     let cy = L.startY - 0x60; if (cy < 0) cy = 0; if (cy >= this.camMaxY) cy = this.camMaxY;
     this.camX = cx; this.camY = cy << 16; // Camera_Y_pos es un long (16.16)
-    this.objects = [s];
+    this.slots = new Array(0x80).fill(null);
+    this.slots[0] = s; s.slot = 0;
+    this.camXCoarse = 0;
+    this.initOscillators();
+    this.ringMgr = new RingManager(this);
+    this.initObjectsManager();
     this.runAnimatedArt();
   }
+
+  // Carga una lista PLC de la ROM (palabra = n-1; entradas: dc.l arte Nemesis, dc.w VRAM)
+  loadPLC(label) {
+    const rom = this.rom;
+    let a = rom.o[label];
+    const n = rom.s16(a) + 1; a += 2;
+    for (let i = 0; i < n; i++, a += 6) {
+      const art = rom.u32(a), vram = rom.u16(a + 4);
+      this.vdp.loadTiles(rom.nem(art), vram >> 5);
+    }
+  }
+
+  // ------------------------------------------------------------------ osciladores
+  initOscillators() {
+    const init = [0x7D, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0, 0x80, 0,
+      0x3848, 0xEE, 0x2080, 0xB4, 0x3080, 0x10E, 0x5080, 0x1C2, 0x7080, 0x276, 0x80, 0, 0x4000, 0xFE];
+    this.oscControl = init[0];
+    this.osc = new Uint16Array(32);
+    for (let i = 0; i < 32; i++) this.osc[i] = init[i + 1];
+  }
+
+  oscillateDo() {
+    if (this.sonic.routine >= 6) return;
+    const data = [2, 0x10, 2, 0x18, 2, 0x20, 2, 0x30, 4, 0x20, 8, 8, 8, 0x40, 4, 0x40, 2, 0x38, 2, 0x38, 2, 0x20, 3, 0x30, 5, 0x50, 7, 0x70, 2, 0x40, 2, 0x40];
+    let d3 = this.oscControl;
+    for (let i = 0, d1 = 15; i < 16; i++, d1--) {
+      const d2 = data[i * 2], d4 = data[i * 2 + 1];
+      if (!((d3 >> d1) & 1)) {
+        this.osc[i * 2 + 1] = u16(this.osc[i * 2 + 1] + d2);
+        this.osc[i * 2] = u16(this.osc[i * 2] + this.osc[i * 2 + 1]);
+        if (!(d4 > (this.osc[i * 2] >> 8))) d3 |= 1 << d1;
+      } else {
+        this.osc[i * 2 + 1] = u16(this.osc[i * 2 + 1] - d2);
+        this.osc[i * 2] = u16(this.osc[i * 2] + this.osc[i * 2 + 1]);
+        if (!(d4 <= (this.osc[i * 2] >> 8))) d3 &= ~(1 << d1);
+      }
+    }
+    this.oscControl = d3;
+  }
+
+  // Byte de Oscillating_Data (offset en bytes)
+  oscByte(off) {
+    const w = this.osc[off >> 1];
+    return (off & 1) ? (w & 0xFF) : (w >> 8);
+  }
+
+  // ------------------------------------------------------------------ objetos
+  allocSlot(from) {
+    for (let i = from; i < 0x80; i++) if (!this.slots[i]) return i;
+    return -1;
+  }
+
+  spawn(cls, slot) {
+    if (slot < 0) return null;
+    const o = new cls(this);
+    o.slot = slot;
+    this.slots[slot] = o;
+    return o;
+  }
+
+  allocObject(cls) { return this.spawn(cls, this.allocSlot(0x10)); }
+  allocObjectAfter(cur, cls) { return this.spawn(cls, this.allocSlot(Math.max(cur.slot + 1, 0x10))); }
+
+  deleteObject(o) {
+    if (o && this.slots[o.slot] === o) this.slots[o.slot] = null;
+    if (o) o.deleted = true;
+  }
+
+  initObjectsManager() {
+    const rom = this.rom;
+    this.objLayout = [];
+    let a = rom.o.Objects_EHZ_1;
+    for (;;) {
+      const x = rom.u16(a);
+      if (x === 0xFFFF) break;
+      this.objLayout.push({ x, yw: rom.u16(a + 2), id: rom.u8(a + 4), subtype: rom.u8(a + 5) });
+      a += 6;
+    }
+    // índices de respawn (a partir de 2; los dos primeros bytes no se usan)
+    let ri = 2;
+    for (const e of this.objLayout) e.respawn = (e.yw & 0x8000) ? ri++ : 0;
+    this.respawn = new Uint8Array(0x300);
+    this.objRight = 0; this.objLeft = 0;
+    let d6 = this.camX - 0x80; if (d6 < 0) d6 = 0; d6 &= 0xFF80;
+    while (this.objRight < this.objLayout.length && this.objLayout[this.objRight].x < d6) this.objRight++;
+    d6 -= 0x80;
+    if (d6 >= 0) while (this.objLeft < this.objLayout.length && this.objLayout[this.objLeft].x < d6) this.objLeft++;
+    this.camXLast = -1;
+    this.objectsManager(true);
+  }
+
+  chkLoadObj(e) {
+    if (e.respawn) {
+      if (this.respawn[e.respawn] & 0x80) return true;
+      this.respawn[e.respawn] |= 0x80;
+    }
+    const cls = OBJ_CLASSES[e.id];
+    if (!cls) return true; // objeto aún no portado
+    const o = this.allocObject(cls);
+    if (!o) { if (e.respawn) this.respawn[e.respawn] &= 0x7F; return false; }
+    o.id = e.id;
+    o.x = e.x;
+    o.y = e.yw & 0xFFF;
+    o.respawn_index = e.respawn;
+    o.render_flags = (e.yw >> 13) & 3;
+    o.status = o.render_flags;
+    o.subtype = e.subtype;
+    return true;
+  }
+
+  objectsManager(first) {
+    this.camXCoarse = u16((this.camX - 0x80) & 0xFF80);
+    let d6 = this.camX & 0xFF80;
+    if (!first && d6 === this.camXLast) return;
+    const L = this.objLayout;
+    if (first || d6 > this.camXLast) {
+      this.camXLast = d6;
+      const lim = d6 + 0x280;
+      while (this.objRight < L.length && L[this.objRight].x < lim) {
+        if (!this.chkLoadObj(L[this.objRight])) break;
+        this.objRight++;
+      }
+      const left = d6 - 0x80;
+      if (left >= 0) while (this.objLeft < L.length && L[this.objLeft].x < left) this.objLeft++;
+    } else {
+      this.camXLast = d6;
+      const left = d6 - 0x80;
+      if (left >= 0) {
+        while (this.objLeft > 0 && L[this.objLeft - 1].x > left) {
+          if (!this.chkLoadObj(L[this.objLeft - 1])) break;
+          this.objLeft--;
+        }
+      }
+      const lim = d6 + 0x280;
+      while (this.objRight > 0 && L[this.objRight - 1].x >= lim) this.objRight--;
+    }
+  }
+
+  collectRing() {
+    if (this.rings < 999) this.rings++;
+    this.audio.sfx('Ring');
+    if (this.rings >= 100 && !(this.extraLifeFlags & 2)) { this.extraLifeFlags |= 2; this.extraLife(); }
+    else if (this.rings >= 200 && !(this.extraLifeFlags & 4)) { this.extraLifeFlags |= 4; this.extraLife(); }
+  }
+
+  extraLife() { this.lives++; this.audio.music('ExtraLife'); }
 
   // LoadAnimatedBlocks: parchea la tabla de bloques con APM_EHZ (datos de la ROM)
   applyAnimatedBlocks() {
@@ -135,18 +287,138 @@ class Game {
     if (l.length < 0x3F) l.push(o);
   }
 
-  touchResponse(o) {} // pendiente: interacción con objetos
+  // TouchResponse: anillos y objetos con collision_flags
+  touchResponse(a0) {
+    this.ringMgr.touch(a0);
+    const d2 = s16(a0.x - 8);
+    let d5 = s8(a0.y_radius) - 3;
+    let d3 = s16(a0.y - d5);
+    if (a0.mapping_frame === 0x4D) { d3 += 0xC; d5 = 0xA; }
+    const d4 = 0x10;
+    d5 *= 2;
+    const rom = this.rom, sizes = rom.o.Touch_Sizes;
+    for (let i = 0x10; i < 0x80; i++) {
+      const a1 = this.slots[i];
+      if (!a1 || !a1.collision_flags) continue;
+      const f = a1.collision_flags & 0x3F;
+      const w = rom.u8(sizes + f * 2), h = rom.u8(sizes + f * 2 + 1);
+      let d0 = s16(a1.x - w - d2);
+      if (d0 < 0) { if (d0 + w * 2 < 0) continue; } else if (d0 > d4) continue;
+      d0 = s16(a1.y - h - d3);
+      if (d0 < 0) { if (d0 + h * 2 < 0) continue; } else if (d0 > d5) continue;
+      return this.touchChkValue(a0, a1);
+    }
+    return 0;
+  }
 
-  killCharacter(o) {
-    if (o.routine >= 6) return;
+  touchChkValue(a0, a1) {
+    const cf = a1.collision_flags, kind = cf & 0xC0;
+    if (kind === 0) return this.touchEnemy(a0, a1);
+    if (kind === 0xC0) return this.touchSpecial(a0, a1);
+    if (kind === 0x80) return this.touchChkHurt(a0, a1);
+    if ((cf & 0x3F) === 6) { // monitor
+      if (a0.y_vel < 0) {
+        if (u16(a0.y - 0x10) < u16(a1.y)) return 0;
+        a0.y_vel = s16(-a0.y_vel);
+        a1.y_vel = -0x180;
+        if (!a1.routine_secondary) a1.routine_secondary = 4;
+        return 0;
+      }
+      if (a0.anim !== ANI.Roll) return 0;
+      a0.y_vel = s16(-a0.y_vel);
+      a1.routine = 4;
+      a1.parent = a0;
+      return 0;
+    }
+    if (a0.invulnerable_time < 90) { a1.routine = 4; a1.parent = a0; }
+    return 0;
+  }
+
+  touchSpecial(a0, a1) {
+    const d1 = a1.collision_flags & 0x3F;
+    if (d1 === 7) { a1.collision_property = 2; return this.touchEnemy(a0, a1); }
+    if (d1 === 0xB) { a1.status |= NO_BALANCING; return this.touchChkHurt(a0, a1); }
+    if ([6, 0xA, 0x14, 0x15, 0x16, 0x17, 0x18].includes(d1)) { a1.collision_property = u8(a1.collision_property + 1); return 0; }
+    if (d1 === 0x1A) { a1.collision_property = 0xFF; return this.touchEnemy(a0, a1); }
+    if (d1 === 0x21) { a1.collision_property = u8(a1.collision_property + 1); return 0; }
+    return 0;
+  }
+
+  touchEnemy(a0, a1) {
+    if (!(a0.status_secondary & ST2_INVINC) && a0.anim !== ANI.Spindash && a0.anim !== ANI.Roll) return this.touchChkHurt(a0, a1);
+    if (a1.collision_property) {
+      a0.x_vel = s16(-a0.x_vel); a0.y_vel = s16(-a0.y_vel);
+      a1.collision_flags = 0;
+      if (--a1.collision_property === 0) a1.status |= NO_BALANCING;
+      return 0;
+    }
+    // Touch_KillEnemy
+    a1.status |= NO_BALANCING;
+    let d0 = this.chainBonus;
+    this.chainBonus += 2;
+    if (d0 >= 6) d0 = 6;
+    a1.pointsFrame = d0;
+    let pts = [10, 20, 50, 100][d0 >> 1];
+    if (this.chainBonus >= 0x20) { pts = 1000; a1.pointsFrame = 0xA; }
+    this.addPoints(pts);
+    this.becomeExplosion(a1);
+    if (a0.y_vel < 0) { a0.y_vel = s16(a0.y_vel + 0x100); return 0; }
+    if (u16(a0.y) >= u16(a1.y)) { a0.y_vel = s16(a0.y_vel - 0x100); return 0; }
+    a0.y_vel = s16(-a0.y_vel);
+    return 0;
+  }
+
+  touchChkHurt(a0, a1) {
+    if (a0.status_secondary & ST2_INVINC) return -1;
+    if (a0.invulnerable_time) return -1;
+    return this.hurtCharacter(a0, a1);
+  }
+
+  hurtCharacter(a0, a2) {
+    if (!(a0.status_secondary & ST2_SHIELD)) {
+      if (this.rings === 0) return this.killCharacter(a0, a2);
+      const lr = this.allocObject(typeof Obj37 !== 'undefined' ? Obj37 : Obj);
+      if (lr) { lr.id = 0x37; lr.x = a0.x; lr.y = a0.y; lr.parent = a0; }
+    }
+    a0.status_secondary &= ~ST2_SHIELD;
+    a0.routine = 4;
+    a0.resetOnFloorPart2();
+    a0.status |= ST_AIR;
+    a0.y_vel = -0x400; a0.x_vel = -0x200;
+    if (a0.status & ST_UNDERWATER) { a0.y_vel = -0x200; a0.x_vel = -0x100; }
+    if (!(u16(a0.x) < u16(a2.x))) a0.x_vel = s16(-a0.x_vel);
+    a0.inertia = 0;
+    a0.anim = ANI.Hurt2;
+    a0.invulnerable_time = 0x78;
+    this.audio.sfx(a2.id === 0x36 ? 'HurtBySpikes' : 'Hurt');
+    return -1;
+  }
+
+  killCharacter(o, cause) {
     o.status_secondary = 0;
     o.routine = 6;
-    o.status &= ~0x40; // (el ajuste completo se porta junto con TouchResponse)
+    o.resetOnFloorPart2();
+    o.status |= ST_AIR;
     o.y_vel = -0x700; o.x_vel = 0; o.inertia = 0;
-    o.status |= 2;
     o.anim = ANI.Death;
     o.art_tile |= 0x8000;
-    this.audio.sfx('Hurt');
+    this.audio.sfx(cause && cause.id === 0x36 ? 'HurtBySpikes' : 'Hurt');
+    return -1;
+  }
+
+  addPoints(n) {
+    this.score += n;
+    if (this.score > 999999) this.score = 999999;
+  }
+
+  becomeExplosion(a1) {
+    // Obj27 (explosión) sustituye al enemigo en su misma ranura
+    if (typeof Obj27 === 'undefined') { this.deleteObject(a1); return; }
+    const e = new Obj27(this);
+    e.slot = a1.slot; e.id = 0x27; e.x = a1.x; e.y = a1.y;
+    e.respawn_index = a1.respawn_index; e.pointsFrame = a1.pointsFrame;
+    this.slots[a1.slot] = e;
+    a1.deleted = true;
   }
 
   gameOver() { this.lives = 3; }
@@ -262,29 +534,67 @@ class Game {
     this.prevPad = held;
     this.frame++;
     for (const l of this.displayLists) l.length = 0;
-    // RunObjects
-    for (const o of this.objects) if (o) o.update();
+    // RunObjects (con el jugador muerto solo se dibujan los objetos visibles)
+    const dead = this.sonic.routine >= 6;
+    for (let i = 0; i < 0x80; i++) {
+      const o = this.slots[i];
+      if (!o) continue;
+      if (dead && i >= 0x10) { if (o.render_flags & RF_ONSCREEN) this.displaySprite(o); continue; }
+      o.update();
+    }
     if (this.levelInactive) { this.startLevel(); return; }
     // DeformBgLayer
     if (!this.scrollLock) { this.scrollHoriz(); this.scrollVerti(); }
     this.swScrlEHZ();
+    this.ringMgr.update();
     this.runAnimatedArt();
     this.palCycle();
+    this.oscillateDo();
+    this.ringMgr.changeFrame();
     this.buildSprites();
+    this.objectsManager(false);
   }
 
-  // BuildSprites: recorre las listas de prioridad 0..7
+  // BuildSprites: anillos y listas de prioridad 0..7
   buildSprites() {
     const camX = this.camX, camY = this.camY >> 16;
+    const vdp = this.vdp;
+    vdp.sprites.length = 0;
+    if (this.buildHUD) this.buildHUD();
+    this.ringMgr.build();
     for (let p = 0; p < 8; p++) {
       for (const o of this.displayLists[p]) {
-        let pieces;
-        if (o === this.sonic) pieces = this.getMapping(this.rom.o.MapUnc_Sonic, o.mapping_frame);
-        else if (o.mappings) pieces = this.getMapping(o.mappings, o.mapping_frame);
-        else continue;
-        const sx = o.render_flags & 4 ? o.x - camX : o.x - 128;
-        const sy = o.render_flags & 4 ? o.y - camY : o.y - 128;
-        this.vdp.addSprite(pieces, sx, sy, o.art_tile, o.render_flags & 3);
+        o.render_flags &= ~RF_ONSCREEN;
+        const base = o === this.sonic ? this.rom.o.MapUnc_Sonic : o.mappings;
+        if (!base) continue;
+        const flips = o.render_flags & 3;
+        if (o.render_flags & RF_MULTI) {
+          const sx = o.x - camX;
+          if (sx + o.mainspr_width < 0 || sx - o.mainspr_width >= 320) continue;
+          const sy = o.y - camY;
+          if (((sy + 128) & 0x7FF) < 128 - 32 || ((sy + 128) & 0x7FF) >= 128 + 224 + 32) continue;
+          if (o.mainspr_mapframe) vdp.addSprite(this.getMapping(base, o.mainspr_mapframe), sx, sy, o.art_tile, flips);
+          o.render_flags |= RF_ONSCREEN;
+          for (const c of o.children) {
+            vdp.addSprite(this.getMapping(base, c.frame), c.x - camX, s16(((c.y - camY + 128) & 0x7FF) - 128), o.art_tile, flips);
+          }
+          continue;
+        }
+        let sx, sy;
+        if (o.render_flags & RF_LEVEL) {
+          sx = o.x - camX;
+          if (sx + o.width_pixels < 0 || sx - o.width_pixels >= 320) continue;
+          sy = o.y - camY;
+          if (o.render_flags & RF_EXPLICIT_H) {
+            if (sy + o.y_radius < 0 || sy - o.y_radius >= 224) continue;
+          } else {
+            const t = (sy + 128) & 0x7FF;
+            if (t < 128 - 32 || t >= 128 + 224 + 32) continue;
+            sy = t - 128;
+          }
+        } else { sx = o.x - 128; sy = o.y - 128; }
+        vdp.addSprite(this.getMapping(base, o.mapping_frame), sx, sy, o.art_tile, flips);
+        o.render_flags |= RF_ONSCREEN;
       }
     }
   }

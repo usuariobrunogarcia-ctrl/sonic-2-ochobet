@@ -157,6 +157,5 @@ class VDP {
       }
     }
     this.ctx.putImageData(this.img, 0, 0);
-    this.sprites.length = 0;
   }
 }
