@@ -588,6 +588,7 @@ class RingManager {
     rings.sort((p, q) => p.x - q.x);
     this.rings = rings;
     this.total = rings.length;
+    this.perfect = rings.length;
     this.consuming = [];
     this.animFrame = 0; this.animCounter = 0;
     this.start = 0; this.end = 0;
@@ -614,6 +615,8 @@ class RingManager {
     this.updateWindow();
   }
 
+  perfectLeft() { return this.perfect; }
+
   changeFrame() {
     if (--this.animCounter < 0) { this.animCounter = 7; this.animFrame = (this.animFrame + 1) & 3; }
   }
@@ -634,6 +637,7 @@ class RingManager {
       const dy = s16(ring.y - 6 - d3);
       if (dy < -12 || dy > d5) continue;
       ring.state = 1; ring.timer = 6; ring.frame = 4;
+      this.perfect--;
       this.consuming.push(ring);
       this.game.collectRing();
     }

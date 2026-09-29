@@ -81,6 +81,19 @@ class HUD {
       }
     }
     if (g.lives !== this.lastLives) this.lives();
+    if (g.updateBonusScore) {
+      // Hud_TimeRingBonus: total, tiempo, anillos y perfecto (4 cifras, ceros a la izquierda en blanco)
+      g.updateBonusScore = false;
+      let t = 0x520;
+      for (const v of g.bonus) {
+        let div = 1000, started = false;
+        for (let i = 0; i < 4; i++, div /= 10, t += 2) {
+          const d = Math.floor(v / div) % 10;
+          if (d) started = true;
+          this.putChar(t, started ? d * 2 : -1);
+        }
+      }
+    }
   }
 
   // BuildHUD: el contador de anillos parpadea a 0 y el tiempo a partir de 9:00

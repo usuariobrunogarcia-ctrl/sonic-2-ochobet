@@ -31,47 +31,97 @@ class Game {
     this.startLevel();
   }
 
+  // Level: carga del acto con cartel de título (Level_TtlCard) y arranque del bucle principal
   startLevel() {
     const rom = this.rom, vdp = this.vdp, L = this.level;
+    if (this.lives <= 0) { this.lives = 3; this.score = 0; this.lastStarPole = 0; }
+    if (this.nextActPending) { this.nextActPending = false; }
     vdp.vram.fill(0);
     vdp.loadTiles(L.art, 0);
-    for (const plc of ['PlrList_Std1', 'PlrList_Std2', 'PlrList_Ehz1', 'PlrList_Ehz2', 'PlrList_EhzAnimals', 'PlrList_Explosion']) this.loadPLC(plc);
+    for (const plc of ['PlrList_Std1', 'PlrList_Std2', 'PlrList_Ehz1', 'PlrList_Ehz2']) this.loadPLC(plc);
+    loadTitleCardArt(this);
     // Paletas: Pal_BGND (líneas 0-1) y Pal_EHZ (líneas 1-3)
     const pal = (addr, n) => { const w = []; for (let i = 0; i < n; i++) w.push(rom.u16(addr + i * 2)); return w; };
     vdp.setPalette(0, pal(rom.o.Pal_BGND, 32));
     vdp.setPalette(1, pal(rom.o.Pal_EHZ, 48));
-    this.normalPalette = vdp.palette.slice();
     this.applyAnimatedBlocks();
     this.animCounters = new Uint8Array(16);
     this.palCycleTimer = 0; this.palCycleFrame = 0;
     this.layerDef = 0;
+    this.levelFrame = 0;
     // LevelSizeLoad
     this.camMinX = L.minX; this.camMaxX = L.maxX; this.camMinY = L.minY; this.camMaxY = L.maxY;
     this.camYBias = 0x60; this.lookDelay = 0;
     this.horizScrollDelay = 0;
-    this.scrollLock = false; this.controlLocked = false;
+    this.scrollLock = false; this.controlLocked = true;
     this.levelInactive = false; this.timeOver = false; this.bossActive = false;
     this.chainBonus = 0;
-    this.rings = 0; this.score = 0; this.timer = 0; this.extraLifeFlags = 0;
+    this.rings = 0; this.extraLifeFlags = 0;
+    if (this.score === undefined) this.score = 0;
     this.ringSpillCounter = 0; this.ringSpillAccum = 0; this.ringSpillFrame = 0; this.rngSeed = this.rngSeed || 0;
     this.sonicTopSpeed = 0x600; this.sonicAccel = 0xC; this.sonicDecel = 0x80;
-    const s = this.sonic = new Sonic(this);
-    s.x = L.startX; s.y = L.startY;
-    let cx = L.startX - 0xA0; if (cx < 0) cx = 0; if (cx >= this.camMaxX) cx = this.camMaxX;
-    let cy = L.startY - 0x60; if (cy < 0) cy = 0; if (cy >= this.camMaxY) cy = this.camMaxY;
-    this.camX = cx; this.camY = cy << 16; // Camera_Y_pos es un long (16.16)
+    this.bonus = [0, 0, 0, 0]; this.updateBonusScore = false;
     this.slots = new Array(0x80).fill(null);
+    this.titleOverlay = this.titleOverlay || new TitleOverlay();
+    this.levelStarted = false;
+    this.timerParts = { min: 0, sec: 0, frame: 0 };
+    this.updateHudTimer = false;
+    const s = this.sonic = new Sonic(this);
     this.slots[0] = s; s.slot = 0;
+    let cx, cy;
+    const cp = this.lastStarPole ? this.checkpoint : null;
+    if (cp) {
+      // Obj79_LoadData
+      s.x = cp.x; s.y = cp.y;
+      this.timerParts = { min: cp.timer.min, sec: cp.timer.sec - 1, frame: 59 };
+      s.savedArt = cp.art_tile; s.savedTop = cp.top; s.savedLrb = cp.lrb;
+      this.camMaxY = cp.camMaxY;
+      cx = cp.camX; cy = cp.camY;
+    } else {
+      s.x = L.startX; s.y = L.startY;
+      cx = s.x; cy = s.y;
+    }
+    cx -= 0xA0; if (cx < 0) cx = 0; if (cx >= this.camMaxX) cx = this.camMaxX;
+    cy -= 0x60; if (cy < 0) cy = 0; if (cy >= this.camMaxY) cy = this.camMaxY;
+    if (cp) { cx = cp.camX; cy = cp.camY; }
+    this.camX = cx; this.camY = cy << 16; // Camera_Y_pos es un long (16.16)
     this.camXCoarse = 0;
     this.initOscillators();
-    this.ringMgr = new RingManager(this);
-    this.timerParts = { min: 0, sec: 0, frame: 0 };
-    this.updateHudTimer = true;
     this.hud = new HUD(this);
+    this.buildHUD = () => { if (this.levelStarted) this.hud.build(); };
+    spawnTitleCard(this);
+    this.phase = 'titlecard';
+    this.loadWait = 0;
+    this.audio.music('EHZ');
+  }
+
+  // Segunda parte de la carga (tras llegar el nombre de la zona): objetos, anillos, HUD
+  finishLevelLoad() {
     this.hud.base();
-    this.buildHUD = () => this.hud.build();
+    this.ringMgr = new RingManager(this);
     this.initObjectsManager();
     this.runAnimatedArt();
+    this.titleCardLeaving = true;
+    this.tcZoneName.leaving = true;
+    this.tcLeft.routine = 0xE;
+    this.tcLeft.loc = 0xA;
+    this.phase = 'titleleave';
+  }
+
+  // Load_EndOfAct: resultados y bonificaciones
+  loadEndOfAct() {
+    const rom = this.rom, s = this.sonic;
+    s.status_secondary = 0;
+    this.updateHudTimer = false;
+    const r = this.allocObject(Obj3A);
+    if (r) r.id = 0x3A;
+    this.loadPLC('PlrList_Results');
+    this.updateBonusScore = true;
+    let d0 = Math.floor((this.timerParts.min * 60 + this.timerParts.sec) / 15);
+    if (d0 >= 20) d0 = 20;
+    this.bonus = [0, rom.u16(rom.o.TimeBonuses + d0 * 2), this.rings * 10, 0];
+    if (this.ringMgr.perfectLeft() === 0) this.bonus[3] = 5000;
+    this.audio.music('EndLevel');
   }
 
   // Carga una lista PLC de la ROM (palabra = n-1; entradas: dc.l arte Nemesis, dc.w VRAM)
@@ -310,7 +360,7 @@ class Game {
 
   // TouchResponse: anillos y objetos con collision_flags
   touchResponse(a0) {
-    this.ringMgr.touch(a0);
+    if (this.ringMgr) this.ringMgr.touch(a0);
     const d2 = s16(a0.x - 8);
     let d5 = s8(a0.y_radius) - 3;
     let d3 = s16(a0.y - d5);
@@ -442,8 +492,9 @@ class Game {
     a1.deleted = true;
   }
 
-  gameOver() { this.lives = 3; }
-  showTimeOver() {}
+  // Game Over / Time Over (Obj39): texto en pantalla y reinicio del acto
+  gameOver() { this.overText = 'GAME OVER'; this.overTimer = 240; this.audio.music('GameOver'); }
+  showTimeOver() { this.overText = 'TIME OVER'; this.overTimer = 240; this.lastStarPole = 0; }
 
   // ------------------------------------------------------------------ cámara
   scrollHoriz() {
@@ -554,16 +605,41 @@ class Game {
     this.padPress = held & ~this.prevPad;
     this.prevPad = held;
     this.frame++;
-    this.hud.update(); // HudUpdate se ejecuta en la interrupción vertical
     for (const l of this.displayLists) l.length = 0;
-    // RunObjects (con el jugador muerto solo se dibujan los objetos visibles)
-    const dead = this.sonic.routine >= 6;
-    for (let i = 0; i < 0x80; i++) {
-      const o = this.slots[i];
-      if (!o) continue;
-      if (dead && i >= 0x10) { if (o.render_flags & RF_ONSCREEN) this.displaySprite(o); continue; }
-      o.update();
+    if (this.phase === 'titlecard') {
+      // Level_TtlCard: solo se ejecutan los objetos del cartel
+      const zn = this.tcZoneName;
+      if (zn.x === zn.xTarget && ++this.loadWait > 20) { this.finishLevelLoad(); }
+      else { this.runObjects(1); this.buildSprites(); return; }
     }
+    if (this.phase === 'titleleave') {
+      this.ctrlHeld = 0; this.ctrlPress = 0;
+      this.swScrlEHZ();
+      this.runObjects();
+      this.buildSprites();
+      if (!this.slots[this.tcBackground.slot] || this.tcBackground.deleted) {
+        for (const o of [this.tcZoneName, this.tcZone, this.tcAct]) {
+          if (!o.deleted) { o.routine = 0x16; o.anim_frame_duration = 0x2D; }
+        }
+        this.controlLocked = false;
+        this.levelStarted = true;
+        this.updateHudTimer = true;
+        this.phase = 'level';
+        this.plcAfterTitle = false;
+      }
+      return;
+    }
+    // Level_MainLoop
+    this.levelFrame++;
+    if (this.overTimer && --this.overTimer === 0) { this.overText = null; this.levelInactive = true; }
+    this.hud.update(); // HudUpdate se ejecuta en la interrupción vertical
+    if (!this.plcAfterTitle && this.tcZoneName.deleted) {
+      // Obj34_LoadStandardWaterAndAnimalArt
+      this.plcAfterTitle = true;
+      this.loadPLC('PlrList_StdWtr');
+      this.loadPLC('PlrList_EhzAnimals');
+    }
+    this.runObjects();
     if (this.levelInactive) { this.startLevel(); return; }
     // DeformBgLayer
     if (!this.scrollLock) { this.scrollHoriz(); this.scrollVerti(); }
@@ -578,8 +654,29 @@ class Game {
       this.ringSpillFrame = (this.ringSpillAccum >> 9) & 3;
       this.ringSpillCounter--;
     }
+    this.checkLoadSignpostArt();
     this.buildSprites();
     this.objectsManager(false);
+  }
+
+  runObjects(from = 0) {
+    // con el jugador muerto solo se dibujan los objetos dinámicos visibles
+    const dead = this.sonic.routine >= 6;
+    for (let i = from; i < 0x80; i++) {
+      const o = this.slots[i];
+      if (!o) continue;
+      if (dead && i >= 0x10) { if (o.render_flags & RF_ONSCREEN) this.displaySprite(o); continue; }
+      o.update();
+    }
+  }
+
+  checkLoadSignpostArt() {
+    const d1 = this.camMaxX - 0x100;
+    if (this.camX < d1) return;
+    if (!this.updateHudTimer) return;
+    if (this.camMinX === d1) return;
+    this.camMinX = d1;
+    this.loadPLC('PlrList_Signpost');
   }
 
   // BuildSprites: anillos y listas de prioridad 0..7
@@ -588,7 +685,7 @@ class Game {
     const vdp = this.vdp;
     vdp.sprites.length = 0;
     if (this.buildHUD) this.buildHUD();
-    this.ringMgr.build();
+    if (this.levelStarted) this.ringMgr.build();
     for (let p = 0; p < 8; p++) {
       for (const o of this.displayLists[p]) {
         o.render_flags &= ~RF_ONSCREEN;
@@ -647,7 +744,10 @@ class Game {
 
   render() {
     const L = this.level;
-    this.vdp.planeA = (x, y) => L.tileAt(x, y, 0);
+    const ov = this.titleOverlay, camX = this.camX, vs = this.vdp.vscrollA;
+    this.vdp.planeA = ov && ov.active
+      ? (x, y) => { const w = ov.get((x - camX) >> 3, (y - vs) >> 3); return w || L.tileAt(x, y, 0); }
+      : (x, y) => L.tileAt(x, y, 0);
     this.vdp.planeB = (x, y) => L.tileAt(x, y, 1);
     this.vdp.render();
   }

@@ -76,6 +76,9 @@ class Sonic extends GameObject {
     g.sonicTopSpeed = 0x600; g.sonicAccel = 0xC; g.sonicDecel = 0x80;
     this.art_tile = 0x780;
     this.top_solid_bit = 0xC; this.lrb_solid_bit = 0xD;
+    if (this.savedArt !== undefined) { // al empezar en un poste de control
+      this.art_tile = this.savedArt; this.top_solid_bit = this.savedTop; this.lrb_solid_bit = this.savedLrb;
+    }
     this.status_secondary = 0;
     this.obj_control = 0; this.move_lock = 0; this.jumping = 0;
     this.spindash_flag = 0; this.spindash_counter = 0;
