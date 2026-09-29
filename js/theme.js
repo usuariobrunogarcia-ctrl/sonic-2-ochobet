@@ -215,6 +215,15 @@ class Theme {
     let l = 0, r = 0;
     for (let d = 1; d <= 7; d++) { if (!l && !this.origPix(x - d, y)) l = d; if (!r && !this.origPix(x + d, y)) r = d; }
     if (l && r) return this.pole(x, y, c, l, r);
+    // cintas finas sin hierba (el sacacorchos): viga de acero
+    let u = 0, dn = 0, grassy = false;
+    for (let d = 1; d <= 64; d++) {
+      const m = this.mat(x, y - d);
+      if (m === 2) { grassy = true; break; }
+      if (m === 0) { u = d; break; }
+    }
+    if (u && !grassy) for (let d = 1; d <= 64; d++) if (!this.mat(x, y + d)) { dn = d; break; }
+    if (u && dn && u + dn < 72) return this.girder(x, y, u - 1, dn - 1);
     if (this.panelCell(x >> 3, y >> 3)) {
       if (this.panelSmall(x >> 3, y >> 3)) return this.panel(x, y);
       return this.masonry(x, y, c, true);                 // muro interior en sombra
@@ -244,6 +253,21 @@ class Theme {
     if ((y & 15) === 0) return TH.STEEL[0];
     if ((y & 15) === 1) return f < 0.5 ? TH.STEEL[2] : TH.STEEL[1];
     return f < 0.35 ? TH.STEEL[2] : f < 0.7 ? TH.STEEL[1] : TH.STEEL[0];
+  }
+
+  // Viga de celosía: cordones claros arriba, oscuros abajo, diagonales y remaches
+  girder(x, y, up, down) {
+    if (up === 0) return TH.DEEP;
+    if (down === 0) return TH.DEEP;
+    if (up === 1) return TH.STEEL[2];
+    if (up === 2) return TH.STEEL[1];
+    if (down === 1) return TH.STEEL[0];
+    if (down === 2) return TH.STEEL[1];
+    const a = (x + y) & 15, b = (x - y) & 15;
+    if (a === 0 || b === 0) return TH.STEEL[1];
+    if (a === 1 || b === 15) return TH.STEEL[0];
+    if (up === 3 && (x & 7) === 4) return TH.RUST;         // remaches
+    return TH.DEEP;
   }
 
   // Panel rehundido con tachones dorados (uno por celda de 8x8)
