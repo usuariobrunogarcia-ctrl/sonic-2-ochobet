@@ -13,6 +13,7 @@ class Game {
     this.vdp = new VDP(canvas);
     this.audio = audio || new NullAudio();
     this.level = new Level(rom);
+    buildUnderground(this.level, rom); // diseño nuevo del nivel: Underground Zone
     this.sine = new Int16Array(0x140);
     for (let i = 0; i < 0x140; i++) this.sine[i] = rom.s16(rom.o.Sine_Data + i * 2);
     this.angleData = rom.slice(rom.o.Angle_Data, 0x102);
@@ -203,16 +204,11 @@ class Game {
 
   initObjectsManager() {
     const rom = this.rom;
-    this.objLayout = [];
-    let a = rom.o.Objects_EHZ_1;
-    for (;;) {
-      const x = rom.u16(a);
-      if (x === 0xFFFF) break;
-      this.objLayout.push({ x, yw: rom.u16(a + 2), id: rom.u8(a + 4), subtype: rom.u8(a + 5) });
-      a += 6;
-    }
+    const L = this.level;
+    // objetos del diseño del nivel (si lo hay) o los de EHZ 1 de la ROM
+    this.objLayout = (L.objects || readObjectsEHZ1(rom)).map((e) => ({ ...e }));
     // objetos añadidos (Crabmeat, Meleon en paredes, vías y carritos de mina), ordenados por X
-    for (const e of extraObjectsEHZ1(this)) this.objLayout.push(e);
+    for (const e of extraObjects(this, L.extras)) this.objLayout.push(e);
     this.objLayout.sort((p, q) => p.x - q.x);
     // índices de respawn (a partir de 2; los dos primeros bytes no se usan)
     let ri = 2;

@@ -7,6 +7,8 @@ const s8 = (v) => (v << 24) >> 24;
 const u8 = (v) => v & 0xFF;
 const u16 = (v) => v & 0xFFFF;
 
+const LEVEL_ROWS = 8, LEVEL_COLS = 256;
+
 class Level {
   constructor(rom) {
     this.rom = rom;
@@ -19,6 +21,11 @@ class Level {
     this.chunks = new Uint16Array(0x8000 >> 1);
     for (let i = 0; i < bm128.length >> 1; i++) this.chunks[i] = (bm128[i * 2] << 8) | bm128[i * 2 + 1];
     this.layout = rom.kos('Level_EHZ1');
+    // Primer plano en formato ancho (como en S3K): 8 filas de hasta 256 chunks (32768 px).
+    // Por defecto es el de EHZ 1; un diseño nuevo lo sustituye con setForeground().
+    this.fg = new Uint8Array(LEVEL_ROWS * LEVEL_COLS);
+    for (let r = 0; r < LEVEL_ROWS; r++) for (let c = 0; c < 128; c++) this.fg[r * LEVEL_COLS + c] = this.layout[r * 256 + c];
+    this.w = 0x2A00; this.fgWidth = 0x4000;
     this.colP = rom.kos('ColP_EHZHTZ');
     this.colS = rom.kos('ColS_EHZHTZ');
     this.colV = rom.slice(o.ColArrayVertical, 0x1000);
@@ -29,14 +36,30 @@ class Level {
     this.secondaryAngle = 0;
     this.a4 = 0; // 0 = Primary_Angle, 1 = Secondary_Angle
     // Tamaño del nivel (LevelSize, EHZ acto 1)
-    this.minX = 0; this.maxX = 0x29A0; this.minY = 0; this.maxY = 0x320;
+    this.minX = 0; this.maxX = this.w - 0x60; this.minY = 0; this.maxY = 0x320;
     this.startX = rom.u16(o.StartLocations); this.startY = rom.u16(o.StartLocations + 2);
+  }
+
+  // Primer plano nuevo: columnas de chunks (cada una, 8 chunks de arriba abajo)
+  // (w = ancho jugable en píxeles; las columnas de después sólo se ven tras el cartel final)
+  setForeground(columns, w = columns.length * 128) {
+    this.fg.fill(0);
+    columns.forEach((col, c) => { for (let r = 0; r < LEVEL_ROWS; r++) this.fg[r * LEVEL_COLS + c] = col[r]; });
+    this.w = w;
+    this.fgWidth = columns.length * 128;
+    this.maxX = this.w - 0x60;
+  }
+
+  // Chunk del primer plano en (x, y); fuera de las 8 filas no hay nada
+  fgChunk(x, y) {
+    const r = (y >> 7) & 15;
+    return r < LEVEL_ROWS ? this.fg[r * LEVEL_COLS + ((x >> 7) & (LEVEL_COLS - 1))] : 0;
   }
 
   // Palabra de patrón del primer plano (layer 0) o fondo (layer 1) en coordenadas de nivel.
   tileAt(x, y, layer) {
-    x &= 0x3FFF; y &= 0x7FF;
-    const chunk = this.layout[((y >> 7) << 8) + (layer << 7) + (x >> 7)];
+    x &= 0x7FFF; y &= 0x7FF;
+    const chunk = layer ? this.layout[((y >> 7) << 8) + 128 + ((x >> 7) & 0x7F)] : this.fgChunk(x, y);
     const bw = this.chunks[(chunk << 6) + (((y >> 4) & 7) << 3) + ((x >> 4) & 7)];
     let px = x & 15, py = y & 15;
     let flip = 0;
@@ -53,9 +76,7 @@ class Level {
 
   // Find_Tile: devuelve la palabra de bloque 16x16 del chunk en (d3, d2)
   findTile(d2, d3) {
-    const row = (d2 * 2) & 0xF00;
-    const col = (u16(d3) >> 7) & 0x7F;
-    const chunk = this.layout[row + col];
+    const chunk = this.fgChunk(u16(d3), d2 & 0x7FF);
     return this.chunks[(chunk << 6) + ((d2 & 0x70) >> 1) + ((u16(d3) >> 4) & 7)];
   }
 

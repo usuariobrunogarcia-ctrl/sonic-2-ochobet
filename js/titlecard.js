@@ -7,11 +7,46 @@ const TC_BLUE = 0x8000 | (ART.TitleCard + 0x5A);
 const TC_RED = 0x8000 | (ART.TitleCard + 0x58);
 const TC_YELLOW = 0x8000 | (1 << 13) | (ART.TitleCard + 0x5C);
 
-// Carga ArtNem_TitleCard y las letras de "EMERALD HILL" (LoadTitleCard)
+// Letras del cartel en ArtNem_TitleCard2: desplazamiento y tamaño en patrones (las
+// letras E, N, O y Z están en ArtNem_TitleCard, junto a "ZONE"), como en s2.asm
+const TC_LETTERS2 = {
+  A: [0, 4], B: [4, 4], C: [8, 4], D: [0xC, 4], F: [0x10, 4], G: [0x14, 4], H: [0x18, 4], I: [0x1C, 2],
+  J: [0x1E, 4], K: [0x22, 4], L: [0x26, 4], M: [0x2A, 6], P: [0x30, 4], Q: [0x34, 4], R: [0x38, 4],
+  S: [0x3C, 4], T: [0x40, 4], U: [0x44, 4], V: [0x48, 4], W: [0x4C, 6], X: [0x52, 4], Y: [0x56, 4],
+};
+const TC_LETTERS1 = { E: 0, N: 4, O: 8, Z: 0xC };
+
+// Carga ArtNem_TitleCard y las letras del nombre de la zona (LoadTitleCard). Con un
+// nombre propio (level.zoneName) se cargan sus letras y se monta el frame del nombre.
 function loadTitleCardArt(g) {
   const rom = g.rom;
   g.vdp.loadTiles(rom.nem('ArtNem_TitleCard'), ART.TitleCard);
   const letters = rom.nem('ArtNem_TitleCard2');
+  const name = g.level.zoneName;
+  if (name) {
+    const at = {};
+    let dst = 0x5DE;
+    for (const ch of name) {
+      if (at[ch] !== undefined || !TC_LETTERS2[ch]) continue;
+      const [c, n] = TC_LETTERS2[ch];
+      g.vdp.loadTiles(letters.subarray(c * 32, c * 32 + n * 32), dst);
+      at[ch] = dst; dst += n;
+    }
+    // piezas de 2x2 patrones (3x2 para M y W, 1x2 para I), 16 px por letra y 16 por espacio
+    const pieces = [];
+    const width = (ch) => (ch === ' ' ? 16 : (TC_LETTERS2[ch] ? TC_LETTERS2[ch][1] : 4) * 4);
+    let x = 32 - ([...name].reduce((w, ch) => w + width(ch), 0) >> 1);
+    for (const ch of name) {
+      const w = width(ch);
+      if (ch !== ' ') {
+        const tile = TC_LETTERS1[ch] !== undefined ? ART.TitleCard + TC_LETTERS1[ch] : at[ch];
+        if (tile !== undefined) pieces.push({ y: 0, size: (((w >> 3) - 1) << 2) | 1, tile: 0x8000 | tile, x });
+      }
+      x += w;
+    }
+    g.zoneNameFrame = pieces;
+    return;
+  }
   let a = rom.o.TitleCardLetters_EHZ, dst = 0x5DE;
   for (;;) {
     const c = rom.u8(a);
@@ -163,6 +198,7 @@ function spawnTitleCard(g) {
   }
   // el número de acto usa el frame $12 (acto 1); el nombre usa el frame de la zona (EHZ = 0)
   objs[2].mapping_frame = 0x12;
+  if (g.zoneNameFrame) objs[0].frames = [g.zoneNameFrame];
   g.tcZoneName = objs[0]; g.tcZone = objs[1]; g.tcAct = objs[2];
   g.tcBackground = objs[3]; g.tcBottom = objs[4]; g.tcLeft = objs[5];
   g.tcBottom.loc = 0x26;

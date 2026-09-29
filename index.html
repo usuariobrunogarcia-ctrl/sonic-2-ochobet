@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sonic 2 - Emerald Hill</title>
+<title>Sonic 2 - Underground Zone</title>
 <style>
   :root { --bg: #101018; --fg: #e8e8f0; --accent: #2a6cf0; --muted: #9aa0b4; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
@@ -38,11 +38,12 @@
 </head>
 <body>
   <div id="loader">
-    <h1>Sonic the Hedgehog 2 — Emerald Hill Zone Act 1</h1>
+    <h1>Sonic the Hedgehog 2 — Underground Zone</h1>
     <p>Recreación en JavaScript a partir del desensamblado <a href="https://github.com/sonicretro/s2disasm" style="color:#8ab4ff">sonicretro/s2disasm</a>.
-      Los gráficos, niveles y colisiones se leen de tu propia ROM (no se incluye).</p>
+      Los gráficos, niveles y colisiones se leen de tu propia ROM (no se incluye).
+      Underground Zone es un nivel nuevo, el doble de largo, montado a partir de Emerald Hill.</p>
     <p>Selecciona la ROM de <b>Sonic The Hedgehog 2 (World)</b>, REV00 o REV01 (.bin / .md / .gen / .smd):</p>
-    <p class="opt"><input type="checkbox" id="theme"> <label for="theme" class="plain">Tema <b>Ruinas</b>: arte nuevo en pixel art (mismo nivel y colisiones)</label></p>
+    <p class="opt"><input type="checkbox" id="theme" checked> <label for="theme" class="plain">Tema <b>Ruinas</b>: arte nuevo en pixel art (mismo nivel y colisiones)</label></p>
     <label>Cargar ROM<input type="file" id="romfile" accept=".bin,.md,.gen,.smd"></label>
     <p id="err"></p>
   </div>
@@ -77,6 +78,7 @@
 <script src="js/newart.js"></script>
 <script src="js/badniks.js"></script>
 <script src="js/minecart.js"></script>
+<script src="js/underground.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/titlecard.js"></script>
 <script src="js/theme.js"></script>

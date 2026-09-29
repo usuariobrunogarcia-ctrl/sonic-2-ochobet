@@ -570,20 +570,39 @@ class Obj49 extends Obj {
 const OBJ_CLASSES = { 0x03: Obj03, 0x11: Obj11, 0x18: Obj18, 0x1C: Obj1C, 0x49: Obj49 };
 
 // ------------------------------------------------------------------ anillos del nivel
+// Lista de anillos de EHZ 1 ([x, y] sueltos; las filas y columnas se expanden)
+function readRingsEHZ1(rom) {
+  const rings = [];
+  let a = rom.o.Rings_EHZ_1;
+  for (;;) {
+    const x = rom.u16(a);
+    if (x & 0x8000) break;
+    const w = rom.u16(a + 2); a += 4;
+    const n = (w >> 12) & 7, y = w & 0xFFF;
+    const col = (w & 0x8000) !== 0;
+    for (let i = 0; i <= n; i++) rings.push(col ? [x, y + i * 0x18] : [x + i * 0x18, y]);
+  }
+  return rings;
+}
+
+// Lista de objetos de EHZ 1 (x, palabra y+flags, id, subtype)
+function readObjectsEHZ1(rom) {
+  const list = [];
+  let a = rom.o.Objects_EHZ_1;
+  for (;;) {
+    const x = rom.u16(a);
+    if (x === 0xFFFF) break;
+    list.push({ x, yw: rom.u16(a + 2), id: rom.u8(a + 4), subtype: rom.u8(a + 5) });
+    a += 6;
+  }
+  return list;
+}
+
 class RingManager {
   constructor(game) {
     this.game = game;
-    const rom = game.rom;
-    const rings = [];
-    let a = rom.o.Rings_EHZ_1;
-    for (;;) {
-      const x = rom.u16(a);
-      if (x & 0x8000) break;
-      const w = rom.u16(a + 2); a += 4;
-      const n = (w >> 12) & 7, y = w & 0xFFF;
-      const col = (w & 0x8000) !== 0;
-      for (let i = 0; i <= n; i++) rings.push({ x: col ? x : x + i * 0x18, y: col ? y + i * 0x18 : y, state: 0 });
-    }
+    // anillos del diseño del nivel (si lo hay) o los de EHZ 1 de la ROM
+    const rings = (game.level.rings || readRingsEHZ1(game.rom)).map(([x, y]) => ({ x, y, state: 0 }));
     // ordenación por X (estable, como el bucle de burbuja del original)
     rings.sort((p, q) => p.x - q.x);
     this.rings = rings;
