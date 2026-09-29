@@ -7,8 +7,9 @@ class NullAudio {
 }
 
 class Game {
-  constructor(rom, canvas, audio) {
+  constructor(rom, canvas, audio, opts = {}) {
     this.rom = rom;
+    this.themeOn = !!opts.theme;
     this.vdp = new VDP(canvas);
     this.audio = audio || new NullAudio();
     this.level = new Level(rom);
@@ -40,6 +41,7 @@ class Game {
     vdp.setPalette(0, pal(rom.o.Pal_BGND, 32));
     vdp.setPalette(1, pal(rom.o.Pal_EHZ, 48));
     this.applyAnimatedBlocks();
+    if (this.themeOn) { if (!this.theme) this.theme = new Theme(this); this.theme.apply(); }
     this.animCounters = new Uint8Array(16);
     this.palCycleTimer = 0; this.palCycleFrame = 0;
     this.layerDef = 0;
@@ -89,6 +91,15 @@ class Game {
     this.phase = 'titlecard';
     this.loadWait = 0;
     this.audio.music('EHZ');
+  }
+
+  // Cambia entre el arte original y el tema "Ruinas" (arte nuevo) sin reiniciar
+  setTheme(on) {
+    if (on === !!this.themeOn) return;
+    this.themeOn = on;
+    if (on) { if (!this.theme) this.theme = new Theme(this); this.theme.apply(); }
+    else if (this.theme) this.theme.remove();
+    if (this.animCounters) { for (let i = 0; i < this.animCounters.length; i += 2) this.animCounters[i] = 0; this.runAnimatedArt(); }
   }
 
   // Segunda parte de la carga (tras llegar el nombre de la zona): objetos, anillos, HUD
@@ -317,7 +328,8 @@ class Game {
         else { c[s * 2] = rom.u8(a2 + 9 + f * 2); tileId = rom.u8(a2 + 8 + f * 2); }
         const src = (rom.u32(a2) & 0xFFFFFF) + tileId * 32;
         const nTiles = rom.u8(a2 + 7);
-        vdp.loadTiles(rom.b.subarray(src, src + nTiles * 32), rom.u16(a2 + 4) >> 5);
+        const dest = rom.u16(a2 + 4) >> 5;
+        vdp.loadTiles(this.themeOn ? this.theme.animFrame(src, nTiles, dest) : rom.b.subarray(src, src + nTiles * 32), dest);
       }
       let size = rom.u8(a2 + 6);
       if (dur < 0) size *= 2;
@@ -786,7 +798,7 @@ class Game {
     this.vdp.planeA = ov && ov.active
       ? (x, y) => { const w = ov.get((x - camX) >> 3, (y - vs) >> 3); return w || L.tileAt(x, y, 0); }
       : (x, y) => L.tileAt(x, y, 0);
-    this.vdp.planeB = (x, y) => L.tileAt(x, y, 1);
+    this.vdp.planeB = this.themeOn ? this.theme.bgPlane : (x, y) => L.tileAt(x, y, 1);
     this.vdp.render();
   }
 }

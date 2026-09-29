@@ -14,7 +14,9 @@
   #loader { text-align: center; max-width: 560px; line-height: 1.5; }
   #loader label { display: inline-block; margin-top: 12px; padding: 10px 18px; background: var(--accent);
     border-radius: 6px; cursor: pointer; font-weight: 600; }
-  #loader input { display: none; }
+  #loader input[type=file] { display: none; }
+  #loader label.plain { display: inline; margin: 0; padding: 0; background: none; font-weight: 400; }
+  #themebtn { background: #2a2a38; color: var(--fg); border: 1px solid #44445a; border-radius: 6px; padding: 6px 12px; font-family: inherit; cursor: pointer; }
   #err { color: #ff7070; min-height: 1.5em; }
   .keys { color: var(--muted); font-size: 14px; text-align: center; }
   #touch { display: none; width: min(960px, calc(100vw - 32px)); justify-content: space-between; align-items: center;
@@ -40,6 +42,7 @@
     <p>Recreación en JavaScript a partir del desensamblado <a href="https://github.com/sonicretro/s2disasm" style="color:#8ab4ff">sonicretro/s2disasm</a>.
       Los gráficos, niveles y colisiones se leen de tu propia ROM (no se incluye).</p>
     <p>Selecciona la ROM de <b>Sonic The Hedgehog 2 (World)</b>, REV00 o REV01 (.bin / .md / .gen / .smd):</p>
+    <p class="opt"><input type="checkbox" id="theme"> <label for="theme" class="plain">Tema <b>Ruinas</b>: arte nuevo en pixel art (mismo nivel y colisiones)</label></p>
     <label>Cargar ROM<input type="file" id="romfile" accept=".bin,.md,.gen,.smd"></label>
     <p id="err"></p>
   </div>
@@ -54,7 +57,8 @@
       <button class="st" data-b="128">START</button>
     </div>
   </div>
-  <div class="keys">Flechas: mover · <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>: saltar (A/B/C) · <kbd>Enter</kbd>: Start/pausa</div>
+  <button id="themebtn" hidden>Cambiar tema (T)</button>
+  <div class="keys">Flechas: mover · <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>: saltar (A/B/C) · <kbd>Enter</kbd>: Start/pausa · <kbd>T</kbd>: tema original / Ruinas</div>
 
 <script src="js/offsets.js"></script>
 <script src="js/z80.js"></script>
@@ -71,6 +75,7 @@
 <script src="js/enemies.js"></script>
 <script src="js/hud.js"></script>
 <script src="js/titlecard.js"></script>
+<script src="js/theme.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 </body>

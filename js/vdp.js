@@ -29,6 +29,7 @@ class VDP {
     this.lineB = new Uint8Array(SCREEN_W); this.lineBP = new Uint8Array(SCREEN_W);
     this.fadeLevel = 0; // 0 = normal, 1..7 = oscurecido (fundidos)
     this.whiteFade = 0;
+    this.spriteHook = null;
   }
 
   loadTiles(data, tileIndex) {
@@ -62,6 +63,7 @@ class VDP {
   // (y:byte, tamaño:byte, patrón:word, patrón 2P:word, x:word por pieza).
   // Las piezas se dibujan en el orden dado; la primera queda encima.
   addSprite(pieces, sx, sy, artTile, flags) {
+    if (this.spriteHook && pieces) this.spriteHook(pieces, artTile);
     this.sprites.push({ pieces, sx, sy, artTile, flags });
   }
 

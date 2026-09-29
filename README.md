@@ -31,6 +31,25 @@ También funciona con mando (Gamepad API) y, en móviles, con los controles tác
 - [x] Sonido: emulación de Z80 + YM2612 + PSG ejecutando el driver de sonido original
       de la ROM (música y efectos idénticos)
 
+## Tema "Ruinas" (arte nuevo)
+
+Opcional (casilla en la pantalla de carga o tecla `T` en cualquier momento): un
+reskin del acto en pixel art propio — muros de ladrillo oliva, paneles tallados con
+tachones dorados, hierba seca con raíces colgantes, postes de metal, flores otoñales
+y un fondo nuevo (cielo turquesa, nubes, macizo anaranjado, lago y cordilleras granates).
+
+Se conserva todo lo que define el nivel: layout, chunks, bloques, colisiones y el
+código de scroll por línea (`SwScrl_EHZ`). Sólo cambian los píxeles de los patrones
+y las paletas, dentro de los límites del Mega Drive: patrones de 8x8 a 16 colores,
+4 líneas de paleta con color de 9 bits, volteos de patrón y los mismos índices de VRAM.
+El fondo nuevo (512x256, un plano B de 64x32 celdas) se trocea en patrones con volteos
+y se reduce hasta caber en los patrones del arte del nivel que el primer plano no usa.
+
+El arte del primer plano se genera al vuelo a partir de los patrones de tu ROM: para
+cada patrón se busca su colocación más habitual en el nivel y se pinta en coordenadas
+de mundo usando el color original como mapa de materiales (roca → ladrillo 16x8 a soga
+con juntas en la rejilla de 8 px, damero → paneles, hierba → hierba seca…).
+
 ## Estructura
 
 - `js/offsets.js` — direcciones de datos en la ROM (generadas del listado del desensamblado)
@@ -39,6 +58,7 @@ También funciona con mando (Gamepad API) y, en móviles, con los controles tác
 - `js/level.js` — datos del nivel y colisión con el terreno (`FindFloor`, `FindWall`…)
 - `js/sonic.js` — Obj01 (Sonic)
 - `js/objects*.js`, `js/enemies.js`, `js/titlecard.js`, `js/hud.js` — objetos del nivel
+- `js/theme.js` — tema "Ruinas": generación del arte nuevo y paletas
 - `js/game.js` — bucle del nivel, cámara, fondo, animaciones, gestor de objetos
 - `js/z80.js`, `js/ym2612.js`, `js/psg.js`, `js/sound.js` — hardware de sonido del Mega Drive
 
