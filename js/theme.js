@@ -66,8 +66,8 @@ class Theme {
   // ------------------------------------------------------------------ análisis
   blockAt(x, y) {
     const L = this.level;
-    x &= 0x3FFF; y &= 0x7FF;
-    const chunk = L.layout[((y >> 7) << 8) + (x >> 7)];
+    x &= 0x7FFF; y &= 0x7FF;
+    const chunk = L.fgChunk(x, y);
     return L.chunks[(chunk << 6) + (((y >> 4) & 7) << 3) + ((x >> 4) & 7)];
   }
 
@@ -81,7 +81,7 @@ class Theme {
 
   build() {
     const L = this.level;
-    this.w = 0x2A00; this.h = 0x400;
+    this.w = L.fgWidth; this.h = 0x400;
     // copia expandida del arte original (1 byte por píxel)
     const art = L.art, n = art.length >> 5;
     this.nTiles = n;

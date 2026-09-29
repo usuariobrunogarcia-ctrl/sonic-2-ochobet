@@ -1,7 +1,7 @@
-# Sonic 2 — Emerald Hill Zone (HTML + JavaScript)
+# Sonic 2 — Underground Zone (HTML + JavaScript)
 
-Recreación jugable del primer nivel de *Sonic the Hedgehog 2* (Mega Drive) en
-JavaScript, portando el código del desensamblado
+Recreación jugable de *Sonic the Hedgehog 2* (Mega Drive) en JavaScript, portando
+el código del desensamblado
 [sonicretro/s2disasm](https://github.com/sonicretro/s2disasm).
 
 Los gráficos, paletas, bloques, chunks, layout del nivel, colisiones, mappings
@@ -31,9 +31,27 @@ También funciona con mando (Gamepad API) y, en móviles, con los controles tác
 - [x] Sonido: emulación de Z80 + YM2612 + PSG ejecutando el driver de sonido original
       de la ROM (música y efectos idénticos)
 
+## Underground Zone (nivel nuevo)
+
+Un diseño de nivel distinto, basado en Emerald Hill 1 y **el doble de largo**
+(165 columnas de chunks, 21 120 px, frente a las 84 del original). Se juega con el
+tema "Ruinas" por defecto y el cartel dice UNDERGROUND ZONE (letras de la ROM).
+
+- El nivel se monta con 9 secciones de Emerald Hill reordenadas y repetidas. Sólo se
+  corta donde el perfil del terreno (todas las superficies de la columna, con ±4 px)
+  coincide a ambos lados, así que los caminos de arriba y de abajo siguen conectados.
+- Objetos, anillos, vías y enemigos viajan con su sección; los postes de control se
+  renumeran y en cada unión Sonic vuelve a la capa de colisión principal.
+- Aprovecha los añadidos: 5 vías con carrito (dos de ellas largas, por los túneles que
+  pasan por detrás de la pared bajo los rizos, donde el carrito rompe monitores y badniks),
+  11 Crabmeat y 15 Meleon.
+- El layout usa el formato ancho de S3K (8 filas x 256 columnas de chunks) en lugar del
+  de S2 (16 x 128): ocupa la misma memoria y permite un nivel más largo.
+- El diseño está en `js/underground.js` (lista de secciones y añadidos propios).
+
 ## Tema "Ruinas" (arte nuevo)
 
-Opcional (casilla en la pantalla de carga o tecla `T` en cualquier momento): un
+Activado por defecto (casilla en la pantalla de carga o tecla `T` en cualquier momento): un
 reskin del acto en pixel art propio — muros de ladrillo oliva, paneles tallados con
 tachones dorados, hierba seca con raíces colgantes, postes de metal, flores otoñales
 y un fondo nuevo (cielo turquesa, nubes, macizo anaranjado, lago y cordilleras granates).
@@ -75,6 +93,7 @@ libres en EHZ (la de Coconuts, la de enemigos de zona y la de Tails).
 - `js/objects*.js`, `js/enemies.js`, `js/titlecard.js`, `js/hud.js` — objetos del nivel
 - `js/newart_data.js`, `js/newart.js` — sprites nuevos y su conversión a patrones/piezas
 - `js/badniks.js` — Meleon y Crabmeat; `js/minecart.js` — vías y carritos de mina
+- `js/underground.js` — diseño de Underground Zone
 - `js/theme.js` — tema "Ruinas": generación del arte nuevo y paletas
 - `js/game.js` — bucle del nivel, cámara, fondo, animaciones, gestor de objetos
 - `js/z80.js`, `js/ym2612.js`, `js/psg.js`, `js/sound.js` — hardware de sonido del Mega Drive
@@ -85,7 +104,7 @@ Nuked-OPN2 (emulador exacto a nivel de ciclo) usando la música de Emerald Hill.
 ## Diferencias con el original
 
 - Se juega con Sonic solo (la opción "Sonic alone" del juego); Tails no está portado.
-- Al terminar los resultados se vuelve a empezar el acto 1 (el original pasa al acto 2).
+- Al terminar los resultados se vuelve a empezar el nivel (el original pasa al acto 2).
 - Se conservan los bugs del juego original que afectan a la jugabilidad (por ejemplo
   el derrape asimétrico de `Sonic_TurnLeft`/`Sonic_TurnRight`), igual que con `fixBugs = 0`
   en el desensamblado.

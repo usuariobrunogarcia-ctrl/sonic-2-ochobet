@@ -7,7 +7,8 @@
 // cambia ni el layout ni las colisiones: los railes son sprites dibujados encima.
 
 // Vías de EHZ acto 1: x0..x1 (el tope está en x1), yHint = una Y por encima del suelo
-// en x0, cartX = posición inicial del carrito, launch = velocidad con la que sale Sonic
+// en x0, cartX = posición inicial del carrito, launch = velocidad con la que sale Sonic,
+// high = la vía va por un túnel detrás de la pared (se dibuja con prioridad alta)
 const MINE_TRACKS_EHZ1 = [
   { x0: 0x0A0, x1: 0x340, yHint: 0x280, cartX: 0x0D0, launch: [0x200, -0x800] },
   { x0: 0xCE0, x1: 0xE80, yHint: 0x1E0, cartX: 0xD10, launch: [0x300, -0x500] },
@@ -40,12 +41,19 @@ function trackSurface(t, x) {
   return t.surf[i];
 }
 
-// Objetos que se añaden al layout de EHZ 1: vías, carritos, Crabmeat y Meleon en paredes
-function extraObjectsEHZ1(g) {
+// Crabmeat de EHZ 1 (x, y por encima del suelo) en tramos más o menos llanos
+const CRABMEAT_EHZ1 = [[0x7D0, 0x2F8], [0xA82, 0x270], [0x15CC, 0x230], [0x2148, 0x230], [0x2620, 0x330]];
+
+// Meleon pegados a paredes: x, y, subtype ($80: pared a su derecha, $81: a su izquierda)
+const MELEON_WALLS_EHZ1 = [[0x374, 0x256, 0x80]];
+
+// Objetos que se añaden al layout: vías, carritos, Crabmeat y Meleon en paredes.
+// Por defecto los de EHZ 1; un diseño de nivel nuevo trae los suyos en level.extras.
+function extraObjects(g, extras = { tracks: MINE_TRACKS_EHZ1, crabs: CRABMEAT_EHZ1, walls: MELEON_WALLS_EHZ1 }) {
   const list = [];
   // respawn: 0x8000 en yw (los enemigos destruidos no vuelven a aparecer)
   const add = (x, y, id, subtype, extra, respawn = true) => list.push({ x, yw: (y & 0xFFF) | (respawn ? 0x8000 : 0), id, subtype, extra });
-  MINE_TRACKS_EHZ1.forEach((t, ti) => {
+  extras.tracks.forEach((t, ti) => {
     const surf = trackProfile(g, t);
     for (let sx = t.x0; sx <= t.x1; sx += RAIL_SEG) {
       const ex = Math.min(t.x1, sx + RAIL_SEG - 1);
@@ -54,15 +62,11 @@ function extraObjectsEHZ1(g) {
     }
     add(t.cartX, trackSurface(t, t.cartX) - 0x10, 0xF1, ti, { track: t });
   });
-  // Crabmeat en tramos de suelo más o menos llanos
-  for (const [x, y] of [[0x7D0, 0x2F8], [0xA82, 0x270], [0x15CC, 0x230], [0x2148, 0x230], [0x2620, 0x330]]) add(x, y, 0xF0, 0);
+  for (const [x, y] of extras.crabs) add(x, y, 0xF0, 0);
   // Meleon en paredes (además de los troncos donde estaban los Coconuts)
-  for (const [x, y, sub] of MELEON_WALLS_EHZ1) add(x, y, 0x9D, sub);
+  for (const [x, y, sub] of extras.walls) add(x, y, 0x9D, sub);
   return list;
 }
-
-// Meleon pegados a paredes: x, y, subtype ($80: pared a su derecha, $81: a su izquierda)
-const MELEON_WALLS_EHZ1 = [[0x374, 0x256, 0x80]];
 
 // ------------------------------------------------------------------ vía (railes y tope)
 class ObjMineRail extends Obj {
@@ -87,6 +91,7 @@ class ObjMineRail extends Obj {
       }
       this.frames = [pieces];
       this.mapping_frame = 0;
+      if (t.high) this.art_tile = 0x8000; // vía de un túnel: por delante de la pared
       this.render_flags = RF_LEVEL | RF_EXPLICIT_H;
       this.width_pixels = 0x90;
       this.y_radius = 0x60;
@@ -114,6 +119,7 @@ class ObjMineCart extends Obj {
       this.x = this.track.cartX;
       this.limit = this.track.x1 - 0x20; // se para contra el tope
       this.snap();
+      if (this.track.high) this.art_tile = 0x8000;
     }
     const x0 = this.x;
     switch (this.routine) {
@@ -184,6 +190,21 @@ class ObjMineCart extends Obj {
     return hit;
   }
 
+  // con Sonic dentro, el carrito rompe los monitores y destruye los badniks que encuentra
+  smash() {
+    const g = this.game, s = this.sonic;
+    const ahead = s16(this.x + 0x10), reach = 0x18 + 0x10;
+    for (let i = 0x10; i < 0x80; i++) {
+      const o = g.slots[i];
+      if (!o || o === this || Math.abs(s16(o.x - ahead)) > reach || Math.abs(s16(o.y - this.y)) > 0x28) continue;
+      if (o.id === 0x26 && o.routine === 2) { o.routine = 4; o.parent = s; continue; }
+      if (o.collision_flags && !(o.collision_flags & 0xC0)) {
+        g.addPoints(100); o.pointsFrame = 6;
+        g.becomeExplosion(o);
+      }
+    }
+  }
+
   ride() {
     const g = this.game, s = this.sonic;
     // si a Sonic le hacen daño (o muere) se cae del carrito
@@ -197,6 +218,7 @@ class ObjMineCart extends Obj {
       this.roll();
       return;
     }
+    this.smash();
     if (this.roll()) {
       // choque con el tope: Sonic sale despedido hecho una bola
       this.release();
