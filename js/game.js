@@ -40,6 +40,9 @@ class Game {
     const pal = (addr, n) => { const w = []; for (let i = 0; i < n; i++) w.push(rom.u16(addr + i * 2)); return w; };
     vdp.setPalette(0, pal(rom.o.Pal_BGND, 32));
     vdp.setPalette(1, pal(rom.o.Pal_EHZ, 48));
+    // sprites nuevos (Meleon, Crabmeat, carrito de mina) en zonas libres de la VRAM
+    if (!this.newArt) this.newArt = new NewArt(this);
+    this.newArt.load();
     this.applyAnimatedBlocks();
     if (this.themeOn) { if (!this.theme) this.theme = new Theme(this); this.theme.apply(); }
     this.animCounters = new Uint8Array(16);
@@ -208,6 +211,9 @@ class Game {
       this.objLayout.push({ x, yw: rom.u16(a + 2), id: rom.u8(a + 4), subtype: rom.u8(a + 5) });
       a += 6;
     }
+    // objetos añadidos (Crabmeat, Meleon en paredes, vías y carritos de mina), ordenados por X
+    for (const e of extraObjectsEHZ1(this)) this.objLayout.push(e);
+    this.objLayout.sort((p, q) => p.x - q.x);
     // índices de respawn (a partir de 2; los dos primeros bytes no se usan)
     let ri = 2;
     for (const e of this.objLayout) e.respawn = (e.yw & 0x8000) ? ri++ : 0;
@@ -237,6 +243,7 @@ class Game {
     o.render_flags = (e.yw >> 13) & 3;
     o.status = o.render_flags;
     o.subtype = e.subtype;
+    if (e.extra) Object.assign(o, e.extra);
     return true;
   }
 
@@ -389,7 +396,9 @@ class Game {
       const a1 = this.slots[i];
       if (!a1 || !a1.collision_flags) continue;
       const f = a1.collision_flags & 0x3F;
-      const w = rom.u8(sizes + f * 2), h = rom.u8(sizes + f * 2 + 1);
+      // los objetos nuevos llevan su propio tamaño de colisión (touchW/touchH)
+      const w = a1.touchW !== undefined ? a1.touchW : rom.u8(sizes + f * 2);
+      const h = a1.touchH !== undefined ? a1.touchH : rom.u8(sizes + f * 2 + 1);
       let d0 = s16(a1.x - w - d2);
       if (d0 < 0) { if (d0 + w * 2 < 0) continue; } else if (d0 > d4) continue;
       d0 = s16(a1.y - h - d3);
@@ -740,7 +749,7 @@ class Game {
       for (const o of this.displayLists[p]) {
         o.render_flags &= ~RF_ONSCREEN;
         const base = o === this.sonic ? this.rom.o.MapUnc_Sonic : o.mappings;
-        if (!base) continue;
+        if (!base && !o.frames) continue;
         const flips = o.render_flags & 3;
         if (o.render_flags & RF_MULTI) {
           const sx = o.x - camX;
@@ -767,7 +776,8 @@ class Game {
             sy = t - 128;
           }
         } else { sx = o.x - 128; sy = o.y - 128; }
-        let pieces = this.getMapping(base, o.mapping_frame);
+        // o.frames: piezas ya construidas (sprites nuevos); si no, mappings de la ROM
+        let pieces = o.frames ? o.frames[o.mapping_frame] : this.getMapping(base, o.mapping_frame);
         if (o.singlePiece) pieces = pieces.slice(0, 1);
         vdp.addSprite(pieces, sx, sy, o.art_tile, flips);
         o.render_flags |= RF_ONSCREEN;
