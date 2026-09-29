@@ -6,16 +6,11 @@ class NullAudio {
   sfx() {} music() {} restoreLevelMusic() {} setTempo() {}
 }
 
-class Dust { // Obj08 (polvo del spindash/derrape) - pendiente de portar
-  startSkid() {} startSpindash() {} stopSpindash() {}
-}
-
 class Game {
   constructor(rom, canvas) {
     this.rom = rom;
     this.vdp = new VDP(canvas);
     this.audio = new NullAudio();
-    this.dust = new Dust();
     this.level = new Level(rom);
     this.sine = new Int16Array(0x140);
     for (let i = 0; i < 0x140; i++) this.sine[i] = rom.s16(rom.o.Sine_Data + i * 2);
@@ -68,6 +63,7 @@ class Game {
     this.updateHudTimer = false;
     const s = this.sonic = new Sonic(this);
     this.slots[0] = s; s.slot = 0;
+    this.dust = this.spawn(Obj08, 10); this.dust.id = 8; this.dust.parent = s;
     let cx, cy;
     const cp = this.lastStarPole ? this.checkpoint : null;
     if (cp) {
@@ -280,8 +276,17 @@ class Game {
     return (hi0 | sum) >>> 0;
   }
 
-  spawnShield() { if (typeof Obj38 !== 'undefined' && !this.slots[6]) { const o = this.spawn(Obj38, 6); o.id = 0x38; o.parent = this.sonic; } }
-  spawnInvincibility() { if (typeof Obj35 !== 'undefined') { const o = this.spawn(Obj35, 8); o.id = 0x35; o.parent = this.sonic; } }
+  // Sonic_Shield y Sonic_InvincibilityStars ocupan ranuras reservadas
+  spawnShield() {
+    const cur = this.slots[12];
+    if (cur instanceof Obj38) return;
+    const o = this.spawn(Obj38, 12); o.id = 0x38; o.parent = this.sonic;
+  }
+  spawnInvincibility() {
+    const cur = this.slots[13];
+    if (cur instanceof Obj35) return;
+    const o = this.spawn(Obj35, 13); o.id = 0x35; o.parent = this.sonic;
+  }
 
   extraLife() { this.lives++; this.audio.music('ExtraLife'); }
 
