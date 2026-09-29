@@ -382,3 +382,43 @@ class Obj79 extends Obj {
 }
 
 Object.assign(OBJ_CLASSES, { 0x0D: Obj0D, 0x79: Obj79 });
+
+// ------------------------------------------------------------------ Obj39: GAME OVER / TIME OVER
+class Obj39 extends Obj {
+  update() {
+    const g = this.game;
+    if (this.routine === 0) {
+      this.routine = 2;
+      this.x = (this.mapping_frame & 1) ? 128 + 320 + 48 : 128 - 48;
+      this.y = 128 + 112;
+      this.mappings = g.rom.o.Obj39_MapUnc_14C6C;
+      this.art_tile = 0x4DE | 0x8000;
+      this.render_flags = 0; this.priority = 0;
+    }
+    if (this.routine === 2) {
+      if (this.x === 128 + 160) { this.anim_frame_duration = 0x2D0; this.routine = 4; return; }
+      this.x += this.x < 128 + 160 ? 16 : -16;
+      this.displaySprite();
+      return;
+    }
+    // Obj39_Wait
+    if (!(this.mapping_frame & 1)) {
+      if ((g.padPress & BTN_ABC) || this.anim_frame_duration === 0) {
+        if (g.timeOver) g.levelInactive = true;
+        else g.gameOverReset = true; // en el original: vuelta a la pantalla de SEGA
+        this.displaySprite();
+        return;
+      }
+      this.anim_frame_duration--;
+    }
+    this.displaySprite();
+  }
+}
+
+function spawnOverText(g, frames) {
+  g.loadPLC('PlrList_GameOver');
+  for (let i = 0; i < 2; i++) {
+    const o = g.spawn(Obj39, 0x0E + i);
+    o.id = 0x39; o.mapping_frame = frames[i];
+  }
+}

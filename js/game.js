@@ -497,9 +497,18 @@ class Game {
     a1.deleted = true;
   }
 
-  // Game Over / Time Over (Obj39): texto en pantalla y reinicio del acto
-  gameOver() { this.overText = 'GAME OVER'; this.overTimer = 240; this.audio.music('GameOver'); }
-  showTimeOver() { this.overText = 'TIME OVER'; this.overTimer = 240; this.lastStarPole = 0; }
+  // Game Over / Time Over (Obj39)
+  gameOver() {
+    this.updateHudTimer = false;
+    this.audio.music('GameOver');
+    spawnOverText(this, [0, 1]);
+  }
+  showTimeOver() {
+    this.updateHudTimer = false;
+    this.audio.music('GameOver');
+    spawnOverText(this, [2, 3]);
+    this.checkpoint && (this.checkpoint.timer = { min: 0, sec: 1, frame: 0 });
+  }
 
   // ------------------------------------------------------------------ cámara
   scrollHoriz() {
@@ -612,6 +621,20 @@ class Game {
     this.frame++;
     this.audio.frame();
     for (const l of this.displayLists) l.length = 0;
+    if (this.phase === 'fadeout') {
+      // Pal_FadeToBlack: 22 frames reduciendo rojo, luego verde y luego azul
+      const p = this.vdp.palette;
+      for (let i = 0; i < 64; i++) {
+        const c = p[i];
+        if (c & 0xE) p[i] = c - 2; else if (c & 0xE0) p[i] = c - 0x20; else if (c & 0xE00) p[i] = c - 0x200;
+      }
+      this.buildSprites();
+      if (--this.fadeFrames < 0) {
+        if (this.lives <= 0) { this.score = 0; this.lastStarPole = 0; }
+        this.startLevel();
+      }
+      return;
+    }
     if (this.phase === 'titlecard') {
       // Level_TtlCard: solo se ejecutan los objetos del cartel
       const zn = this.tcZoneName;
@@ -637,7 +660,6 @@ class Game {
     }
     // Level_MainLoop
     this.levelFrame++;
-    if (this.overTimer && --this.overTimer === 0) { this.overText = null; this.levelInactive = true; }
     this.hud.update(); // HudUpdate se ejecuta en la interrupción vertical
     if (!this.plcAfterTitle && this.tcZoneName.deleted) {
       // Obj34_LoadStandardWaterAndAnimalArt
@@ -646,7 +668,11 @@ class Game {
       this.loadPLC('PlrList_EhzAnimals');
     }
     this.runObjects();
-    if (this.levelInactive) { this.startLevel(); return; }
+    if (this.gameOverReset) {
+      this.gameOverReset = false;
+      this.lives = 0; this.levelInactive = true;
+    }
+    if (this.levelInactive) { this.beginFadeOut(); return; }
     // DeformBgLayer
     if (!this.scrollLock) { this.scrollHoriz(); this.scrollVerti(); }
     this.swScrlEHZ();
@@ -663,6 +689,12 @@ class Game {
     this.checkLoadSignpostArt();
     this.buildSprites();
     this.objectsManager(false);
+  }
+
+  beginFadeOut() {
+    this.phase = 'fadeout';
+    this.fadeFrames = 0x15;
+    this.audio.music('FadeOut');
   }
 
   runObjects(from = 0) {

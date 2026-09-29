@@ -98,6 +98,8 @@ const ROM_OFFSETS = {
     Ani_obj08: 0x1DF28,
     movewZ80CompSize: 0xEC04E,
     Snd_Driver: 0xEC0E8,
+    Obj39_MapUnc_14C6C: 0x14C6C,
+    PlrList_GameOver: 0x4271E,
   },
   rev1: {
     ArtKos_EHZ: 0x95C24,
@@ -196,5 +198,7 @@ const ROM_OFFSETS = {
     Ani_obj08: 0x1DF38,
     movewZ80CompSize: 0xEC04E,
     Snd_Driver: 0xEC0E8,
+    Obj39_MapUnc_14C6C: 0x14C6C,
+    PlrList_GameOver: 0x4272E,
   },
 };
