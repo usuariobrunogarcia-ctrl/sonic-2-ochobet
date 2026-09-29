@@ -3,14 +3,14 @@
 // fondo de EHZ (SwScrl_EHZ), arte animado (Dynamic_Normal) y paletas.
 
 class NullAudio {
-  sfx() {} music() {} restoreLevelMusic() {} setTempo() {}
+  sfx() {} sfx2() {} music() {} restoreLevelMusic() {} setTempo() {} pause() {} frame() {} start() {}
 }
 
 class Game {
-  constructor(rom, canvas) {
+  constructor(rom, canvas, audio) {
     this.rom = rom;
     this.vdp = new VDP(canvas);
-    this.audio = new NullAudio();
+    this.audio = audio || new NullAudio();
     this.level = new Level(rom);
     this.sine = new Int16Array(0x140);
     for (let i = 0; i < 0x140; i++) this.sine[i] = rom.s16(rom.o.Sine_Data + i * 2);
@@ -259,7 +259,7 @@ class Game {
 
   collectRing() {
     if (this.rings < 999) this.rings++;
-    this.audio.sfx('Ring');
+    this.audio.sfx2('Ring');
     if (this.rings >= 100 && !(this.extraLifeFlags & 2)) { this.extraLifeFlags |= 2; this.extraLife(); }
     else if (this.rings >= 200 && !(this.extraLifeFlags & 4)) { this.extraLifeFlags |= 4; this.extraLife(); }
   }
@@ -288,7 +288,7 @@ class Game {
     const o = this.spawn(Obj35, 13); o.id = 0x35; o.parent = this.sonic;
   }
 
-  extraLife() { this.lives++; this.audio.music('ExtraLife'); }
+  extraLife() { this.lives++; this.audio.sfx2('ExtraLife'); }
 
   // LoadAnimatedBlocks: parchea la tabla de bloques con APM_EHZ (datos de la ROM)
   applyAnimatedBlocks() {
@@ -610,6 +610,7 @@ class Game {
     this.padPress = held & ~this.prevPad;
     this.prevPad = held;
     this.frame++;
+    this.audio.frame();
     for (const l of this.displayLists) l.length = 0;
     if (this.phase === 'titlecard') {
       // Level_TtlCard: solo se ejecutan los objetos del cartel

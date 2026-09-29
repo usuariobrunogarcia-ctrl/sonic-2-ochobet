@@ -24,9 +24,12 @@ También funciona con mando (Gamepad API).
 - [x] Fondo con parallax de EHZ (`SwScrl_EHZ`), arte animado y ciclo de paleta
 - [x] Sonic (Obj01): física, spindash, rodar, pendientes, sensores, animaciones
 - [x] Cámara (`ScrollHoriz`/`ScrollVerti`, retardo del spindash)
-- [ ] Objetos del nivel: puentes, plataformas, muelles, pinchos, monitores…
-- [ ] Enemigos (Buzzer, Masher, Coconuts), anillos, HUD, cartel final
-- [ ] Sonido
+- [x] Objetos del nivel: puentes, plataformas, cambio de plano, muelles, pinchos, monitores,
+      cascadas, sacacorchos, poste de control
+- [x] Enemigos (Buzzer, Masher, Coconuts), anillos (y anillos perdidos), HUD
+- [x] Cartel de título, cartel de fin de acto y pantalla de resultados
+- [x] Sonido: emulación de Z80 + YM2612 + PSG ejecutando el driver de sonido original
+      de la ROM (música y efectos idénticos)
 
 ## Estructura
 
@@ -35,4 +38,9 @@ También funciona con mando (Gamepad API).
 - `js/vdp.js` — renderizador
 - `js/level.js` — datos del nivel y colisión con el terreno (`FindFloor`, `FindWall`…)
 - `js/sonic.js` — Obj01 (Sonic)
-- `js/game.js` — bucle del nivel, cámara, fondo, animaciones
+- `js/objects*.js`, `js/enemies.js`, `js/titlecard.js`, `js/hud.js` — objetos del nivel
+- `js/game.js` — bucle del nivel, cámara, fondo, animaciones, gestor de objetos
+- `js/z80.js`, `js/ym2612.js`, `js/psg.js`, `js/sound.js` — hardware de sonido del Mega Drive
+
+El Z80 pasa la batería ZEXDOC completa y la salida del YM2612 se ha contrastado con
+Nuked-OPN2 (emulador exacto a nivel de ciclo) usando la música de Emerald Hill.

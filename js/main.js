@@ -34,7 +34,12 @@
     const canvas = document.getElementById('screen');
     document.getElementById('loader').hidden = true;
     canvas.hidden = false;
-    const game = new Game(rom, canvas);
+    const audio = new GameAudio(rom);
+    audio.start();
+    const unlock = () => audio.start();
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('pointerdown', unlock);
+    const game = new Game(rom, canvas, audio);
     window.game = game;
     let paused = false, prevStart = false;
     let last = performance.now(), acc = 0;
@@ -45,9 +50,10 @@
       while (acc >= FRAME) {
         const pad = held | pollGamepad();
         const st = (pad & BTN_START) !== 0;
-        if (st && !prevStart) paused = !paused;
+        if (st && !prevStart) { paused = !paused; audio.pause(paused); }
         prevStart = st;
         if (!paused) { game.padHeld = pad & 0x7F; game.step(); }
+        else audio.frame();
         acc -= FRAME;
       }
       game.render();
