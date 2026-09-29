@@ -26,7 +26,7 @@ También funciona con mando (Gamepad API) y, en móviles, con los controles tác
 - [x] Cámara (`ScrollHoriz`/`ScrollVerti`, retardo del spindash)
 - [x] Objetos del nivel: puentes, plataformas, cambio de plano, muelles, pinchos, monitores,
       cascadas, sacacorchos, poste de control
-- [x] Enemigos (Buzzer, Masher, Coconuts), anillos (y anillos perdidos), HUD
+- [x] Enemigos (Buzzer, Masher, Meleon en lugar de Coconuts, Crabmeat), anillos (y anillos perdidos), HUD
 - [x] Cartel de título, cartel de fin de acto y pantalla de resultados
 - [x] Sonido: emulación de Z80 + YM2612 + PSG ejecutando el driver de sonido original
       de la ROM (música y efectos idénticos)
@@ -50,6 +50,21 @@ cada patrón se busca su colocación más habitual en el nivel y se pinta en coo
 de mundo usando el color original como mapa de materiales (roca → ladrillo 16x8 a soga
 con juntas en la rejilla de 8 px, damero → paneles, hierba → hierba seca…).
 
+## Enemigos nuevos y carritos de mina
+
+- **Meleon** sustituye a Coconuts (el mono que lanza cocos): está escondido en los troncos
+  (y en alguna pared); cuando Sonic se acerca aparece parpadeando, abre la boca, escupe un
+  proyectil dirigido a Sonic y vuelve a desaparecer. Solo se le puede destruir mientras se ve.
+- **Crabmeat** (como el de Sonic 1): anda, se para y lanza dos bolas en arco.
+- **Vías y carritos de mina**: en algunos suelos hay railes con un carrito. Al subirte
+  avanza solo siguiendo la vía; puedes saltar en marcha o dejar que choque con el tope
+  del final, que te lanza por los aires.
+
+Los sprites de Meleon y Crabmeat son de **Dolphman** ("STH2 (8-bit) Badniks - Genesis
+Style"); el carrito, los railes y el tope son arte propio. Todo se convierte al vuelo en
+patrones de 8x8 con las líneas de paleta 0 y 1 ya cargadas y se coloca en zonas de VRAM
+libres en EHZ (la de Coconuts, la de enemigos de zona y la de Tails).
+
 ## Estructura
 
 - `js/offsets.js` — direcciones de datos en la ROM (generadas del listado del desensamblado)
@@ -58,6 +73,8 @@ con juntas en la rejilla de 8 px, damero → paneles, hierba → hierba seca…)
 - `js/level.js` — datos del nivel y colisión con el terreno (`FindFloor`, `FindWall`…)
 - `js/sonic.js` — Obj01 (Sonic)
 - `js/objects*.js`, `js/enemies.js`, `js/titlecard.js`, `js/hud.js` — objetos del nivel
+- `js/newart_data.js`, `js/newart.js` — sprites nuevos y su conversión a patrones/piezas
+- `js/badniks.js` — Meleon y Crabmeat; `js/minecart.js` — vías y carritos de mina
 - `js/theme.js` — tema "Ruinas": generación del arte nuevo y paletas
 - `js/game.js` — bucle del nivel, cámara, fondo, animaciones, gestor de objetos
 - `js/z80.js`, `js/ym2612.js`, `js/psg.js`, `js/sound.js` — hardware de sonido del Mega Drive
