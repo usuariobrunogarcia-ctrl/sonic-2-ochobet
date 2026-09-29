@@ -65,6 +65,11 @@ class Game {
     this.camXCoarse = 0;
     this.initOscillators();
     this.ringMgr = new RingManager(this);
+    this.timerParts = { min: 0, sec: 0, frame: 0 };
+    this.updateHudTimer = true;
+    this.hud = new HUD(this);
+    this.hud.base();
+    this.buildHUD = () => this.hud.build();
     this.initObjectsManager();
     this.runAnimatedArt();
   }
@@ -549,6 +554,7 @@ class Game {
     this.padPress = held & ~this.prevPad;
     this.prevPad = held;
     this.frame++;
+    this.hud.update(); // HudUpdate se ejecuta en la interrupción vertical
     for (const l of this.displayLists) l.length = 0;
     // RunObjects (con el jugador muerto solo se dibujan los objetos visibles)
     const dead = this.sonic.routine >= 6;

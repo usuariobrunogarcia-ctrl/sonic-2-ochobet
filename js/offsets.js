@@ -65,6 +65,9 @@ const ROM_OFFSETS = {
     Ani_obj09: 0x37D78,
     Obj9D_ClimbData: 0x37C92,
     Obj9D_ThrowData: 0x37D66,
+    HUD_MapUnc_40A9A: 0x40A8A,
+    Art_Hud: 0x4133C,
+    Art_LivesNums: 0x4163C,
   },
   rev1: {
     ArtKos_EHZ: 0x95C24,
@@ -130,5 +133,8 @@ const ROM_OFFSETS = {
     Ani_obj09: 0x37D88,
     Obj9D_ClimbData: 0x37CA2,
     Obj9D_ThrowData: 0x37D76,
+    HUD_MapUnc_40A9A: 0x40A9A,
+    Art_Hud: 0x4134C,
+    Art_LivesNums: 0x4164C,
   },
 };
