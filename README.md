@@ -44,3 +44,11 @@ También funciona con mando (Gamepad API) y, en móviles, con los controles tác
 
 El Z80 pasa la batería ZEXDOC completa y la salida del YM2612 se ha contrastado con
 Nuked-OPN2 (emulador exacto a nivel de ciclo) usando la música de Emerald Hill.
+
+## Diferencias con el original
+
+- Se juega con Sonic solo (la opción "Sonic alone" del juego); Tails no está portado.
+- Al terminar los resultados se vuelve a empezar el acto 1 (el original pasa al acto 2).
+- Se conservan los bugs del juego original que afectan a la jugabilidad (por ejemplo
+  el derrape asimétrico de `Sonic_TurnLeft`/`Sonic_TurnRight`), igual que con `fixBugs = 0`
+  en el desensamblado.
